@@ -19,12 +19,21 @@ except ImportError:
     QR_UTILS_AVAILABLE = False
     print("Note: qr_utils.py not found. Manual URI input will be required for device linking.")
 
+# Import Signal App Builder
+try:
+    from create_signal_app import SignalAppBuilder
+    APP_BUILDER_AVAILABLE = True
+except ImportError:
+    APP_BUILDER_AVAILABLE = False
+    print("Note: create_signal_app.py not found. App creation will be skipped.")
+
 
 class SignalCLIRegistration:
     def __init__(self):
         self.phone_number = None
         self.device_name = "signal-cli-desktop"
         self.captcha_url = "https://signalcaptchas.org/registration/generate.html"
+        self.created_app_name = None  # Track the created app name
         
     def check_signal_cli(self) -> bool:
         """Check if signal-cli is installed and accessible"""
@@ -244,6 +253,49 @@ class SignalCLIRegistration:
             print()
             print("Note: Replace $ACCOUNT with your actual phone number")
     
+    def create_signal_app(self):
+        """Create a Signal Desktop .app file for this profile"""
+        if not APP_BUILDER_AVAILABLE:
+            print("⚠️  App creation skipped - create_signal_app.py not available")
+            return
+        
+        print("\n=== Create Signal Desktop App ===")
+        print("Would you like to create a Signal Desktop .app file for easy launching?")
+        print("This will create a clickable app that launches Signal with your profile.")
+        print()
+
+        phone_number_without_plus = self.phone_number.replace('+', '')      
+
+        print()
+        print("We will now create a new launcher app for this separate profile. Choose a name for your Signal app:")
+        print(f"Default: Signal-{phone_number_without_plus}.app")
+        print("Custom name examples: work, personal, family, etc.")
+        print()
+        
+        app_name = input(f"App name (press Enter to just use Signal-{phone_number_without_plus}.app): ").strip()
+        
+        try:
+            builder = SignalAppBuilder()
+            if app_name:
+                app_path = builder.create_app_bundle(self.phone_number, app_name=app_name)
+                self.created_app_name = f"Signal-{app_name}.app"
+                print(f"✅ Created Signal app: {self.created_app_name}")
+            else:
+                app_path = builder.create_app_bundle(self.phone_number)
+                self.created_app_name = f"Signal-{phone_number_without_plus}.app"
+                print(f"✅ Created Signal app: {self.created_app_name}")
+            
+            print(f"📁 Location: {app_path}")
+            print()
+            print("You can now:")
+            print("1. Double-click the app to launch Signal with your profile")
+            print("2. Drag it to your Applications folder")
+            print("3. Add it to your Dock for quick access")
+            
+        except Exception as e:
+            print(f"❌ Error creating Signal app: {e}")
+            print("You can create it manually later using create_signal_app.py")
+    
     def run_wizard(self):
         """Run the interactive wizard"""
         print("=== Signal CLI Setup ===")
@@ -302,45 +354,33 @@ class SignalCLIRegistration:
         print("Your Signal CLI is now registered and ready to use!")
         print("Account data is stored in: ~/.local/share/signal-cli/data/")
     
-    def add_device(self):
-        """Add Signal Desktop as a linked device to this signal-cli primary device"""
-        print(f"\n=== Link Signal Desktop to Signal CLI ===")
-        print(f"Phone number: {self.phone_number}")
-        print()
-        print("This will make Signal Desktop a secondary device linked to your signal-cli.")
-        print("Your signal-cli will remain the primary device.")
-        print()
-        
-        if not self.check_signal_cli():
-            return
-        
-        # Check if this account is registered
+    def verify_account_registered(self) -> bool:
+        """Verify that the account is registered in signal-cli"""
         try:
             result = subprocess.run(['signal-cli', 'listAccounts'], 
                                   capture_output=True, text=True, check=True)
             if self.phone_number not in result.stdout:
                 print(f"Error: Account {self.phone_number} is not registered in signal-cli")
                 print("Please register the account first using option 1")
-                return
+                return False
         except subprocess.CalledProcessError:
             print("Error: Could not check registered accounts")
-            return
+            return False
         
         print("✓ Account verified in signal-cli")
-        print()
-        
-        # Create profile directory name (phone number without +)
+        return True
+    
+    def launch_signal_desktop(self) -> str:
+        """Launch Signal Desktop with specific profile and return profile directory"""
         profile_dir = self.phone_number.replace('+', '')
         user_data_dir = f"/Users/{os.getenv('USER', os.getenv('USERNAME', 'unknown'))}/Library/Application Support/Signal-Profile-{profile_dir}"
         
-        print("=== Launching Signal Desktop ===")
+        print("\n=== Launching Signal Desktop ===")
         print(f"Profile directory: {user_data_dir}")
         print()
         
-        # Launch Signal Desktop with the specific profile
         try:
             print("Launching Signal Desktop...")
-            # Launch in background but redirect output to avoid cluttering terminal
             subprocess.Popen([
                 '/Applications/Signal.app/Contents/MacOS/Signal',
                 f'--user-data-dir={user_data_dir}'
@@ -350,48 +390,43 @@ class SignalCLIRegistration:
             print(f"Error launching Signal Desktop: {e}")
             print("Please launch Signal Desktop manually and continue")
         
-        print()
-        print("=== Desktop Linking Instructions ===")
+        return user_data_dir
+    
+    def show_linking_instructions(self):
+        """Show instructions for linking Signal Desktop"""
+        print("\n=== Desktop Linking Instructions ===")
         print("To link Signal Desktop to your signal-cli:")
         print()
         print("1. Signal Desktop should now be open with the correct profile")
         print("2. Go to File > Preferences > Privacy > Linked devices > Link new device")
         print("3. A QR code will appear")
         print()
+    
+    def read_qr_code_automatically(self) -> Optional[str]:
+        """Try to read QR code automatically if qr_utils is available"""
+        if not QR_UTILS_AVAILABLE:
+            return None
         
-        # Try to automatically read QR code if qr_utils is available
-        link_uri = None
-        if QR_UTILS_AVAILABLE:
-            print("4. QR code detected! Taking screenshot to read it automatically...")
-            print("   (You'll see a screenshot selector - draw a square around the QR code)")
+        print("4. QR code detected! Taking screenshot to read it automatically...")
+        print("   (You'll see a screenshot selector - draw a square around the QR code)")
+        
+        qr_attempts = 0
+        max_qr_attempts = 2
+        
+        while qr_attempts < max_qr_attempts:
+            qr_attempts += 1
+            if qr_attempts > 1:
+                print(f"\n🔄 QR code reading attempt {qr_attempts}/{max_qr_attempts}")
             
-            # Try QR reading with option to retry
-            qr_attempts = 0
-            max_qr_attempts = 2
-            
-            while qr_attempts < max_qr_attempts and not link_uri:
-                qr_attempts += 1
-                if qr_attempts > 1:
-                    print(f"\n🔄 QR code reading attempt {qr_attempts}/{max_qr_attempts}")
-                
-                try:
-                    qr_data = qr_utils.copy_qr_code_from_screenshot()
-                    if qr_data and qr_data.startswith('sgnl://linkdevice?'):
-                        link_uri = qr_data
-                        print(f"✅ QR code read successfully: {qr_data[:50]}...")
-                    else:
-                        print("⚠️  QR code read but doesn't appear to be a valid linking URI")
-                        print("   QR data received: ", qr_data)
-                        
-                        if qr_attempts < max_qr_attempts:
-                            retry = input("   Would you like to try again? (y/n): ").strip().lower()
-                            if retry not in ['y', 'yes']:
-                                print("   Skipping to manual input...")
-                                break
-                        else:
-                            print("   Maximum attempts reached, falling back to manual input...")
-                            
-                except Exception as e:
+            try:
+                qr_data = qr_utils.copy_qr_code_from_screenshot()
+                if qr_data and qr_data.startswith('sgnl://linkdevice?'):
+                    print(f"✅ QR code read successfully: {qr_data[:50]}...")
+                    return qr_data
+                else:
+                    print("⚠️  QR code read but doesn't appear to be a valid linking URI")
+                    print("   QR data received: ", qr_data)
+                    
                     if qr_attempts < max_qr_attempts:
                         retry = input("   Would you like to try again? (y/n): ").strip().lower()
                         if retry not in ['y', 'yes']:
@@ -399,67 +434,59 @@ class SignalCLIRegistration:
                             break
                     else:
                         print("   Maximum attempts reached, falling back to manual input...")
-        
-        # Fall back to manual input if automatic reading failed or isn't available
-        if not link_uri:
-            print()
-            print("=== Manual URI Input Required ===")
-            print("4. Copy the linking URI that appears in Signal Desktop")
-            print("   (It should start with 'sgnl://linkdevice?')")
-            print()
-            print("5. Enter the linking URI below:")
-            print()
-            
-            # Get the linking URI from user
-            while True:
-                link_uri = input("Enter the linking URI from Signal Desktop: ").strip()
-                if not link_uri:
-                    print("Error: URI cannot be empty. Please enter the linking URI.")
-                    continue
-                elif link_uri.startswith('sgnl://linkdevice?'):
-                    print("✅ Valid linking URI detected")
-                    break
+                        
+            except Exception as e:
+                if qr_attempts < max_qr_attempts:
+                    retry = input("   Would you like to try again? (y/n): ").strip().lower()
+                    if retry not in ['y', 'yes']:
+                        print("   Skipping to manual input...")
+                        break
                 else:
-                    print("Error: URI should start with 'sgnl://linkdevice?'")
-                    print("Please check the URI and try again")
-                    print("Example format: sgnl://linkdevice?uuid=...&pub_key=...")
+                    print("   Maximum attempts reached, falling back to manual input...")
         
+        return None
+    
+    def get_linking_uri_manually(self) -> str:
+        """Get linking URI from user manual input"""
+        print("\n=== Manual URI Input Required ===")
+        print("4. Copy the linking URI that appears in Signal Desktop")
+        print("   (It should start with 'sgnl://linkdevice?')")
         print()
-        print("=== Linking Device ===")
+        print("5. Enter the linking URI below:")
+        print()
+        
+        while True:
+            link_uri = input("Enter the linking URI from Signal Desktop: ").strip()
+            if not link_uri:
+                print("Error: URI cannot be empty. Please enter the linking URI.")
+                continue
+            elif link_uri.startswith('sgnl://linkdevice?'):
+                print("✅ Valid linking URI detected")
+                return link_uri
+            else:
+                print("Error: URI should start with 'sgnl://linkdevice?'")
+                print("Please check the URI and try again")
+                print("Example format: sgnl://linkdevice?uuid=...&pub_key=...")
+    
+    def get_linking_uri(self) -> str:
+        """Get linking URI either automatically or manually"""
+        link_uri = self.read_qr_code_automatically()
+        if not link_uri:
+            link_uri = self.get_linking_uri_manually()
+        return link_uri
+    
+    def link_device_to_signal_cli(self, link_uri: str) -> bool:
+        """Link the device using signal-cli"""
+        print("\n=== Linking Device ===")
         print("Adding Signal Desktop as a linked device...")
         
         try:
-            # Use addDevice command to link the device
-            result = subprocess.run([
+            subprocess.run([
                 'signal-cli', '-a', self.phone_number, 'addDevice', '--uri', link_uri
             ], capture_output=True, text=True, check=True)
             
             print("✓ Device linking successful!")
-            print()
-            print("=== Syncing Data ===")
-            print("Downloading contacts and groups from Signal Desktop...")
-            
-            # Run receive to sync data
-            print("Syncing data...")
-            try:
-                subprocess.run([
-                    'signal-cli', '-a', self.phone_number, 'receive'
-                ], timeout=10, check=True)
-                print("✓ Sync completed")
-            except subprocess.TimeoutExpired:
-                print("Sync timeout (this is normal)")
-            except subprocess.CalledProcessError:
-                print("Sync error (this is normal for initial setup)")
-            
-            print()
-            print("=== Setup Complete ===")
-            print("Signal Desktop is now linked to your signal-cli!")
-            print("Your signal-cli remains the primary device with full control.")
-            print("Signal Desktop is now a secondary device for convenient messaging.")
-            print()
-            print("You can manage linked devices with:")
-            print("  signal-cli -a", self.phone_number, "listDevices")
-            print("  signal-cli -a", self.phone_number, "removeDevice -d DEVICE_ID")
+            return True
             
         except subprocess.CalledProcessError as e:
             print(f"Error linking device: {e}")
@@ -467,7 +494,83 @@ class SignalCLIRegistration:
             print("1. The URI is correct and starts with 'sgnl://linkdevice?'")
             print("2. You're running this from the signal-cli account you want to link from")
             print("3. The QR code hasn't expired (generate a new one if needed)")
+            return False
+    
+    def sync_signal_data(self):
+        """Sync contacts and groups from Signal Desktop"""
+        print("\n=== Syncing Data ===")
+        print("Downloading contacts and groups from Signal Desktop...")
+        
+        print("Syncing data...")
+        try:
+            subprocess.run([
+                'signal-cli', '-a', self.phone_number, 'receive'
+            ], timeout=10, check=True)
+            print("✓ Sync completed")
+        except subprocess.TimeoutExpired:
+            print("Sync timeout (this is normal)")
+        except subprocess.CalledProcessError:
+            print("Sync error (this is normal for initial setup)")
+    
+    def show_completion_message(self):
+        """Show final completion message and instructions"""
+        print("\n=== Setup Complete ===")
+        print("Signal Desktop is now linked to your signal-cli!")
+        print("Your signal-cli remains the primary device with full control.")
+        print("Signal Desktop is now a secondary device for convenient messaging.")
+        print()
+        
+        # Suggest moving the app to Applications folder
+        if self.created_app_name:
+            print("📱 Next Steps:")
+            print(f"1. Copy your Signal app to Applications folder:")
+            print(f"   Drag {self.created_app_name} from the current directory to /Applications")
+            print("2. You can then launch Signal from Applications or add to Dock")
+            print()
+        
+        print("You can manage linked devices with:")
+        print("  signal-cli -a", self.phone_number, "listDevices")
+        print("  signal-cli -a", self.phone_number, "removeDevice -d DEVICE_ID")
+
+    def add_device(self):
+        """Add Signal Desktop as a linked device to this signal-cli primary device"""
+        print(f"\n=== Link Signal Desktop to Signal CLI ===")
+        print(f"Phone number: {self.phone_number}")
+        print()
+        print("This will make Signal Desktop a secondary device linked to your signal-cli.")
+        print("Your signal-cli will remain the primary device.")
+        print()
+        
+        # Step 1: Check prerequisites
+        if not self.check_signal_cli():
             return
+        
+        if not self.verify_account_registered():
+            return
+        
+        print()
+        
+        # Step 2: Create Signal Desktop app first
+        self.create_signal_app()
+        
+        # Step 3: Launch Signal Desktop
+        user_data_dir = self.launch_signal_desktop()
+        
+        # Step 4: Show linking instructions
+        self.show_linking_instructions()
+        
+        # Step 5: Get linking URI (automatically or manually)
+        link_uri = self.get_linking_uri()
+        
+        # Step 6: Link the device
+        if not self.link_device_to_signal_cli(link_uri):
+            return
+        
+        # Step 7: Sync data
+        self.sync_signal_data()
+        
+        # Step 8: Show completion message
+        self.show_completion_message()
     
     def run_with_params(self, mode: str, phone_number: str, captcha_token: Optional[str] = None):
         """Run with command line parameters"""
