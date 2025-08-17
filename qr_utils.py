@@ -142,10 +142,8 @@ def read_qr_code_from_image(image_path: Union[str, Path]) -> Optional[str]:
         
         # Make the request
         with urllib.request.urlopen(req, timeout=30) as response:
-            print(f"API response status: {response.status}")
             if response.status == 200:
                 response_data = response.read().decode('utf-8')
-                print(f"API response length: {len(response_data)} characters")
                 
                 data = json.loads(response_data)
                 
@@ -284,11 +282,11 @@ def show_terminal_permission_error():
     print("This is required for automatic QR code reading.")
     print()
     print("INSTRUCTIONS:")
-    print("1. Go to System Preferences > Security & Privacy > Privacy")
-    print("2. Select 'Screen Recording' from the left sidebar")
+    print("1. Go to System Preferences > Security & Privacy")
+    print("2. Select 'Screen & System Audio Recording' from the left sidebar")
     print("3. Click the lock icon to make changes (enter your password)")
-    print("4. Find your terminal app (Terminal, iTerm2, etc.) in the list")
-    print("5. Check the box next to it to grant permission")
+    print("4. Find your terminal app (Terminal, iTerm2, Warp, etc.) in the list")
+    print("5. Check the box next to it to grant permission (if it's not already checked)")
     print("6. Restart your terminal app completely")
     print("7. Run this script again")
     print()
@@ -334,7 +332,7 @@ def copy_qr_code_from_screenshot(debug: bool = False) -> Optional[str]:
             qr_data = read_qr_code_from_image(screenshot_path)
             
             if qr_data:
-                print(f"✅ QR code found: {qr_data}")
+                print(f"✅ QR code found: {qr_data[:50]}...")
                 return qr_data
             else:
                 print("❌ No QR code found in screenshot")

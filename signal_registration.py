@@ -392,13 +392,3 @@ Your device is now linked! For ongoing use, you can:
   signal-cli -a $ACCOUNT daemon   # Run continuously
 
 Note: Replace $ACCOUNT with your actual phone number"""
-
-
-def get_linking_instructions() -> str:
-    """Get desktop linking instructions"""
-    return """=== Desktop Linking Instructions ===
-To link Signal Desktop to your signal-cli:
-
-1. Signal Desktop should now be open with the correct profile
-2. Go to File > Preferences > Privacy > Linked devices > Link new device
-3. A QR code will appear"""
