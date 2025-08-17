@@ -21,11 +21,11 @@ except ImportError:
 
 # Import Signal App Builder
 try:
-    from create_signal_app import SignalAppBuilder
+    from create_signal_launcher import SignalAppBuilder
     APP_BUILDER_AVAILABLE = True
 except ImportError:
     APP_BUILDER_AVAILABLE = False
-    print("Note: create_signal_app.py not found. App creation will be skipped.")
+    print("Note: create_signal_app.py not found. Launcher creation will be skipped.")
 
 
 class SignalCLIRegistration:
@@ -253,10 +253,10 @@ class SignalCLIRegistration:
             print()
             print("Note: Replace $ACCOUNT with your actual phone number")
     
-    def create_signal_app(self):
+    def create_signal_launcher(self):
         """Create a Signal Desktop .app file for this profile"""
         if not APP_BUILDER_AVAILABLE:
-            print("⚠️  App creation skipped - create_signal_app.py not available")
+            print("⚠️  Launcher creation skipped - create_signal_app.py not available")
             return
         
         print("\n=== Create Signal Desktop App ===")
@@ -272,7 +272,7 @@ class SignalCLIRegistration:
         print("Custom name examples: work, personal, family, etc.")
         print()
         
-        app_name = input(f"App name (press Enter to just use Signal-{phone_number_without_plus}.app): ").strip()
+        app_name = input(f"Nickname for this Signal app (Example: work, personal, family, etc.) [Default: {phone_number_without_plus}]: ").strip()
         
         try:
             builder = SignalAppBuilder()
@@ -293,7 +293,7 @@ class SignalCLIRegistration:
             print("3. Add it to your Dock for quick access")
             
         except Exception as e:
-            print(f"❌ Error creating Signal app: {e}")
+            print(f"❌ Error creating Signal launcher: {e}")
             print("You can create it manually later using create_signal_app.py")
     
     def run_wizard(self):
@@ -520,17 +520,36 @@ class SignalCLIRegistration:
         print("Signal Desktop is now a secondary device for convenient messaging.")
         print()
         
-        # Suggest moving the app to Applications folder
+        # Offer to copy app to Applications folder
         if self.created_app_name:
-            print("📱 Next Steps:")
-            print(f"1. Copy your Signal app to Applications folder:")
-            print(f"   Drag {self.created_app_name} from the current directory to /Applications")
-            print("2. You can then launch Signal from Applications or add to Dock")
+            copy_to_apps = input(f"Would you like to copy the app '{self.created_app_name}' to your Applications folder? (y/n): ").strip().lower()
+            
+            if copy_to_apps in ['y', 'yes']:
+                try:
+                    import shutil
+                    source_path = f"./{self.created_app_name}"
+                    dest_path = f"/Applications/{self.created_app_name}"
+                    
+                    if os.path.exists(source_path):
+                        shutil.copytree(source_path, dest_path)
+                        print(f"✅ Successfully copied {self.created_app_name} to /Applications")
+                        print("📱 You can now launch Signal from Applications or add to Dock")
+                    else:
+                        print(f"❌ Could not find {self.created_app_name} in current directory")
+                        print(f"📱 Manual step: Drag {self.created_app_name} to /Applications when you find it")
+                        
+                except Exception as e:
+                    print(f"❌ Error copying to Applications: {e}")
+                    print(f"📱 Manual step: Drag {self.created_app_name} from the current directory to /Applications")
+            else:
+                print("📱 Manual step:")
+                print(f"   Drag {self.created_app_name} from the current directory to /Applications")
+            
             print()
         
-        print("You can manage linked devices with:")
-        print("  signal-cli -a", self.phone_number, "listDevices")
-        print("  signal-cli -a", self.phone_number, "removeDevice -d DEVICE_ID")
+        print(f"You can launch {self.created_app_name} from your Applications folder or Dock")
+
+        print("🎉 Success! You're done!")
 
     def add_device(self):
         """Add Signal Desktop as a linked device to this signal-cli primary device"""
@@ -551,7 +570,7 @@ class SignalCLIRegistration:
         print()
         
         # Step 2: Create Signal Desktop app first
-        self.create_signal_app()
+        self.create_signal_launcher()
         
         # Step 3: Launch Signal Desktop
         user_data_dir = self.launch_signal_desktop()
