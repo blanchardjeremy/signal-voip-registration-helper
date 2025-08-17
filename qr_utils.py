@@ -140,10 +140,6 @@ def read_qr_code_from_image(image_path: Union[str, Path]) -> Optional[str]:
         
         req = urllib.request.Request(url, data=body, headers=headers, method='POST')
         
-        print(f"Making API request to: {url}")
-        print(f"Image size: {len(image_data)} bytes")
-        print(f"Request body size: {len(body)} bytes")
-        
         # Make the request
         with urllib.request.urlopen(req, timeout=30) as response:
             print(f"API response status: {response.status}")
