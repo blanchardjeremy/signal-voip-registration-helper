@@ -5,11 +5,6 @@ Provides functions for reading QR codes from images and screenshots
 """
 
 import subprocess
-import urllib.request
-import urllib.parse
-import urllib.error
-import json
-import tempfile
 import os
 import sys
 import time
@@ -111,139 +106,38 @@ def take_interactive_screenshot(debug: bool = False, attempt: int = 1) -> Option
 
 
 def read_qr_code_from_image(image_path: Union[str, Path]) -> Optional[str]:
-    """Send image to QR code reading API and extract data using built-in urllib"""
+    """Read QR code from image using zbar (local tool)"""
     try:
-        # Prepare the multipart form data manually
-        boundary = '----WebKitFormBoundary' + ''.join([str(x) for x in range(10)])
+        # Use zbarimg to decode QR code from image
+        result = subprocess.run(
+            ['zbarimg', '--quiet', '--raw', str(image_path)],
+            capture_output=True,
+            text=True,
+            check=False
+        )
         
-        with open(image_path, 'rb') as image_file:
-            image_data = image_file.read()
-        
-        # Build multipart form data with proper line endings
-        form_data = []
-        form_data.append(f'--{boundary}\r\n'.encode())
-        form_data.append(b'Content-Disposition: form-data; name="file"; filename="image.png"\r\n')
-        form_data.append(b'Content-Type: image/png\r\n')
-        form_data.append(b'\r\n')
-        form_data.append(image_data)
-        form_data.append(b'\r\n')
-        form_data.append(f'--{boundary}--\r\n'.encode())
-        
-        body = b''.join(form_data)
-        
-        # Create request
-        url = 'http://api.qrserver.com/v1/read-qr-code/'
-        headers = {
-            'Content-Type': f'multipart/form-data; boundary={boundary}',
-            'Content-Length': str(len(body))
-        }
-        
-        req = urllib.request.Request(url, data=body, headers=headers, method='POST')
-        
-        # Make the request
-        with urllib.request.urlopen(req, timeout=30) as response:
-            if response.status == 200:
-                response_data = response.read().decode('utf-8')
-                
-                data = json.loads(response_data)
-                
-                # Extract QR code data from response
-                if data and len(data) > 0:
-                    # The API returns an array, first item contains the symbols
-                    first_item = data[0]
-                    if 'symbol' in first_item and first_item['symbol']:
-                        # symbols is an array, get the first symbol's data
-                        first_symbol = first_item['symbol'][0]
-                        if 'data' in first_symbol and first_symbol['data']:
-                            return first_symbol['data']
-                
-                print("No QR code data found in image")
+        if result.returncode == 0 and result.stdout.strip():
+            # zbarimg outputs the decoded data directly
+            qr_data = result.stdout.strip()
+            return qr_data
+        else:
+            # Check if zbarimg is available
+            if result.returncode == 127:  # Command not found
+                print("Error: zbarimg not found. Please install zbar: brew install zbar")
                 return None
             else:
-                print(f"API request failed with status code: {response.status}")
+                print("No QR code data found in image")
                 return None
                 
-    except urllib.error.URLError as e:
-        print(f"Network error: {e}")
-        return None
-    except urllib.error.HTTPError as e:
-        print(f"HTTP error: {e.code} - {e.reason}")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"Error parsing API response: {e}")
+    except FileNotFoundError:
+        print("Error: zbarimg not found. Please install zbar: brew install zbar")
         return None
     except Exception as e:
         print(f"Unexpected error reading QR code: {e}")
         return None
 
 
-def read_qr_code_from_image_alternative(image_path: Union[str, Path]) -> Optional[str]:
-    """Alternative method using a different API endpoint"""
-    try:
-        print("Trying alternative QR code reading method...")
-        
-        # Try using the GoQR.me API instead
-        url = 'https://api.qrcode-monkey.com/qr/custom'
-        
-        with open(image_path, 'rb') as image_file:
-            image_data = image_file.read()
-        
-        # Convert to base64
-        import base64
-        image_b64 = base64.b64encode(image_data).decode('utf-8')
-        
-        # Try a simpler approach - just send the image directly
-        print("Trying direct image upload...")
-        
-        # Use the original API but with a different approach
-        url = 'https://api.qrserver.com/v1/read-qr-code/'
-        
-        # Create a simpler multipart form
-        boundary = '----WebKitFormBoundary' + ''.join([str(x) for x in range(10)])
-        
-        # Build multipart form data
-        form_data = []
-        form_data.append(f'--{boundary}\r\n'.encode())
-        form_data.append(b'Content-Disposition: form-data; name="file"; filename="screenshot.png"\r\n')
-        form_data.append(b'Content-Type: image/png\r\n')
-        form_data.append(b'\r\n')
-        form_data.append(image_data)
-        form_data.append(b'\r\n')
-        form_data.append(f'--{boundary}--\r\n'.encode())
-        
-        body = b''.join(form_data)
-        
-        headers = {
-            'Content-Type': f'multipart/form-data; boundary={boundary}',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-        }
-        
-        req = urllib.request.Request(url, data=body, headers=headers, method='POST')
-        
-        with urllib.request.urlopen(req, timeout=30) as response:
-            if response.status == 200:
-                response_data = response.read().decode('utf-8')
-                
-                data = json.loads(response_data)
-                
-                if data and len(data) > 0:
-                    # The API returns an array, first item contains the symbols
-                    first_item = data[0]
-                    if 'symbol' in first_item and first_item['symbol']:
-                        # symbols is an array, get the first symbol's data
-                        first_symbol = first_item['symbol'][0]
-                        if 'data' in first_symbol and first_symbol['data']:
-                            return first_symbol['data']
-                
-                print("Alternative method also failed")
-                return None
-            else:
-                print(f"Alternative method failed with status: {response.status}")
-                return None
-                
-    except Exception as e:
-        print(f"Alternative method error: {e}")
-        return None
+
 
 
 def read_qr_code_from_file(file_path: Union[str, Path]) -> Optional[str]:
@@ -411,7 +305,7 @@ def check_dependencies() -> bool:
         print("This module is designed for macOS only")
         return False
     
-    required_commands = ['screencapture', 'pbcopy']
+    required_commands = ['screencapture', 'pbcopy', 'zbarimg']
     missing_commands = []
     
     for cmd in required_commands:
@@ -420,6 +314,8 @@ def check_dependencies() -> bool:
     
     if missing_commands:
         print(f"Missing required commands: {', '.join(missing_commands)}")
+        if 'zbarimg' in missing_commands:
+            print("To install zbar: brew install zbar")
         return False
     
     return True

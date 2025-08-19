@@ -243,19 +243,19 @@ def main():
     epilog="""
 Examples:
   # Create app for phone number (default name)
-  python3 create_signal_app.py +1234567890
+  python3 create_signal_app.py +15551112222
   
   # Create app with custom name
-  python3 create_signal_app.py +1234567890 --name work
+  python3 create_signal_app.py +15551112222 --name work
   
   # Create app with custom output directory
-  python3 create_signal_app.py +1234567890 --output ~/Desktop
+  python3 create_signal_app.py +15551112222 --output ~/Desktop
   
   # Create and test the app
-  python3 create_signal_app.py +1234567890 --test
+  python3 create_signal_app.py +15551112222 --test
   
   # Create and immediately launch the app
-  python3 create_signal_app.py +1234567890 --launch
+  python3 create_signal_app.py +15551112222 --launch
   
   # Just test an existing app
   python3 create_signal_app.py --test-only Signal-work.app
@@ -263,7 +263,7 @@ Examples:
   )
   
   parser.add_argument('phone_number', nargs='?',
-                     help='Phone number for Signal profile (e.g., +1234567890)')
+                     help='Phone number for Signal profile (e.g., +15551112222)')
   parser.add_argument('--name', '-n',
                      help='Custom name for the app (default: cleaned phone number)')
   parser.add_argument('--output', '-o',
@@ -298,7 +298,7 @@ Examples:
   
   # Validate phone number format
   if not args.phone_number.startswith('+'):
-    print("❌ Phone number should start with + (e.g., +1234567890)")
+    print("❌ Phone number should start with + (e.g., +15551112222)")
     sys.exit(1)
   
   # Show what we're creating

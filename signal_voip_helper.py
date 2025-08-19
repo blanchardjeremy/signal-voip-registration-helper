@@ -127,6 +127,21 @@ class SignalCLIInterface:
         """Show welcome screen"""
         self.ui.print_box("Signal Number Setup", "🚀 Let's set up your Signal number!")
     
+    def check_dependencies_upfront(self) -> bool:
+        """Check all dependencies before starting the wizard"""
+        print(self.ui.section_header("Checking Dependencies", "🔍"))
+        
+        # Create a temporary core instance to check dependencies
+        temp_config = RegistrationConfig(phone_number="+15551112222")  # dummy number for check
+        temp_core = SignalCLICore(temp_config)
+        
+        if not temp_core.check_brew_dependencies():
+            print("⚠️  Please install the missing dependencies and run the script again.")
+            return False
+        
+        print("✅ All required dependencies are installed!")
+        return True
+    
     def collect_user_configuration(self) -> UserConfig:
         """Collect all user configuration upfront"""
         print(self.ui.section_header("Project Setup"))
@@ -153,7 +168,7 @@ class SignalCLIInterface:
         while True:
             phone_number = input(self.ui.input_prompt(
                 "What's your phone number?", 
-                "Include country code (e.g., +1234567890)"
+                "Include country code (e.g., +15551112222)"
             )).strip()
             if phone_number and phone_number.startswith('+') and len(phone_number) > 5:
                 break
@@ -527,6 +542,10 @@ class SignalCLIInterface:
         """Run the modern wizard with upfront configuration collection"""
         self.show_welcome()
         
+        # Check dependencies before proceeding
+        if not self.check_dependencies_upfront():
+            sys.exit(1)
+        
         # Collect all configuration upfront
         config = self.collect_user_configuration()
         
@@ -554,6 +573,10 @@ class SignalCLIInterface:
     def run_with_params(self, mode: str, phone_number: str, captcha_token: Optional[str] = None, 
                        captcha_file: Optional[str] = None, device_name: str = "signal-cli-desktop"):
         """Run with command line parameters - using modern flow"""
+        # Check dependencies first
+        if not self.check_dependencies_upfront():
+            sys.exit(1)
+        
         # Create a UserConfig from the parameters
         config = UserConfig(
             phone_number=phone_number,
@@ -603,14 +626,14 @@ Examples:
   python3 signal_voip_helper.py
 
   # Register new account with parameters
-  python3 signal_voip_helper.py register +1234567890 --captcha <token>
+  python3 signal_voip_helper.py register +15551112222 --captcha <token>
 
   # Register using captcha token from file (recommended for long tokens)
-  python3 signal_voip_helper.py register +1234567890 --captcha-file captcha.txt
+  python3 signal_voip_helper.py register +15551112222 --captcha-file captcha.txt
 
   # Add Signal Desktop as linked device (addDevice)
   # Automatically reads QR code from screenshot, or manual URI input
-  python3 signal_voip_helper.py addDevice +1234567890
+  python3 signal_voip_helper.py addDevice +15551112222
 
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
@@ -622,7 +645,7 @@ Note: For captcha tokens, you can:
     parser.add_argument('mode', nargs='?', choices=['register', 'addDevice'],
                        help='Operation mode (register or addDevice)')
     parser.add_argument('phone_number', nargs='?', 
-                       help='Phone number in international format (e.g., +1234567890)')
+                       help='Phone number in international format (e.g., +15551112222)')
     parser.add_argument('--captcha', help='Captcha token for registration')
     parser.add_argument('--captcha-file', help='File containing captcha token (alternative to --captcha)')
     parser.add_argument('--pin', help='Registration PIN (deprecated - will be prompted interactively)')

@@ -100,6 +100,37 @@ class SignalCLICore:
         except Exception:
             return False
     
+    def check_brew_dependencies(self) -> bool:
+        """Check if required brew dependencies are installed"""
+        required_packages = {
+            'signal-cli': 'signal-cli',
+            'zbarimg': 'zbar'
+        }
+        
+        missing_packages = []
+        
+        for command, package in required_packages.items():
+            try:
+                result = subprocess.run(['which', command], 
+                                      capture_output=True, text=True, check=False)
+                if result.returncode != 0:
+                    missing_packages.append(package)
+            except Exception:
+                missing_packages.append(package)
+        
+        if missing_packages:
+            print("❌ Missing required dependencies:")
+            print()
+            for package in missing_packages:
+                print(f"   • {package}")
+            print()
+            print("💡 Install missing dependencies with:")
+            print(f"   brew install {' '.join(missing_packages)}")
+            print()
+            return False
+        
+        return True
+    
     def extract_captcha_token(self, input_text: str) -> str:
         """Extract captcha token from various input formats"""
         # Remove quotes if present

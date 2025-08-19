@@ -1,50 +1,48 @@
 # Signal CLI Registration Script
 
-A Python script for registering new Signal accounts and linking devices using the Signal CLI tool.
+A helper script for registering new Signal accounts and linking to Signal Desktop. macOS support.
+
+This script was designed to help with the workflow of registering Google Voice or other VOIP numbers and attaching them to unique Signal Desktop instances, so you can run multiple Signal numbers from one profile.
+
+**Warning:** This tool is new and hasn't been tested for long-term use. Please report bugs you encounter.
+
+Don't use this to spam people.
 
 ## Features
 
-- **New Account Registration**: Register a new Signal account as a primary device
-- **Device Linking**: Link Signal Desktop as a secondary device to an existing signal-cli account
-- **Interactive Wizard**: User-friendly command-line interface
+- **New Account Registration**: Register a new Signal account as a primary device. The primary "device" is signal-cli on your computer. Though you don't need to ever interact with it that way after you add it to the desktop.
+- **Link Signal Desktop**: Link Signal Desktop as a secondary device to an existing signal-cli account
 - **Captcha Support**: Handles Signal's captcha verification process
-- **SMS/Voice Verification**: Supports both SMS and voice call verification methods
-- **Command Line Interface**: Can be run with parameters for automation
-
-## Prerequisites
-
-### Required Software
-
-1. **Python 3.6+** (Python 3.9.5 recommended)
-2. **signal-cli** - Command line interface for Signal messaging
-
-### Installing signal-cli
-
-Download the latest release from: <https://github.com/AsamK/signal-cli/releases/latest>
-
-For macOS:
-
-```bash
-# Using Homebrew
-brew install signal-cli
-```
 
 ## Installation
 
 1. Clone or download this repository
-2. Ensure `signal-cli` is installed and accessible in your PATH
-3. Make the script executable (optional):
 
    ```bash
-   chmod +x register-number.py
+   git clone https://github.com/blanchardjeremy/signal-voip-registration-helper
+   ```
+
+2. Install dependencies via Homebrew:
+
+   ```bash
+   brew install signal-cli zbarimg
    ```
 
 ## Usage
 
-### Interactive Wizard Mode (Recommended for first-time users)
+## Step 1: Get a VOIP number
+
+You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever nee dto re-verify it.
+
+**Where you can get a VOIP number:**
+
+- [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
+- [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
+
+### Interactive Wizard Mode (Recommended)
 
 ```bash
-python3 register-number.py
+./signal_voip_helper.py
 ```
 
 This will guide you through the setup process step by step.
@@ -55,16 +53,16 @@ This will guide you through the setup process step by step.
 
 ```bash
 # With captcha token
-python3 register-number.py register +1234567890 --captcha <token>
+./signal_voip_helper.py register +15551112222 --captcha <token>
 
 # With captcha token from file (recommended for long tokens)
-python3 register-number.py register +1234567890 --captcha-file captcha.txt
+./signal_voip_helper.py register +15551112222 --captcha-file captcha.txt
 ```
 
 #### Link Signal Desktop as Secondary Device
 
 ```bash
-python3 register-number.py addDevice +1234567890
+./signal_voip_helper.py addDevice +15551112222
 ```
 
 ## Getting Captcha Tokens
@@ -84,7 +82,7 @@ python3 register-number.py addDevice +1234567890
 
 ```bash
 # 1. Run interactive wizard
-python3 register-number.py
+./signal_voip_helper.py
 
 # 2. Choose option 1 (New account registration)
 # 3. Enter phone number
@@ -97,39 +95,12 @@ python3 register-number.py
 
 ```bash
 # 1. Run addDevice mode
-python3 register-number.py addDevice +1234567890
+./signal_voip_helper.py addDevice +15551112222
 
 # 2. Follow instructions to scan QR code from Signal Desktop
 # 3. Enter the linking URI
 # 4. Complete device linking
 ```
-
-## File Structure
-
-```txt
-signal-registration-cli/
-├── register-number.py    # Main script
-├── requirements.txt      # Dependencies documentation
-├── README.md            # This file
-└── qr_utils.py          # QR code utilities (if present)
-```
-
-## Dependencies
-
-### Python Dependencies
-
-All required Python modules are part of the standard library:
-
-- `argparse` - Command line argument parsing
-- `subprocess` - Running external commands
-- `sys` - System-specific parameters
-- `time` - Time-related functions
-- `typing` - Type hints
-- `os` - Operating system interface
-
-### External Dependencies
-
-- **signal-cli** - Must be installed separately (see Prerequisites section)
 
 ## Troubleshooting
 
@@ -149,15 +120,8 @@ All required Python modules are part of the standard library:
    - Verify the linking URI starts with `sgnl://linkdevice?`
    - Ensure you're running from the correct signal-cli account
 
-### Getting Help
-
-- Check that `signal-cli` is working: `signal-cli --version`
-- Verify your phone number format: `+1234567890`
-- Ensure you have a stable internet connection
-
 ## Security Notes
 
-- Captcha tokens are temporary and expire quickly
 - Phone numbers and verification codes should be kept private
 - The script stores no sensitive data locally
 - All Signal data is stored in `~/.local/share/signal-cli/data/`
