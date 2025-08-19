@@ -5,7 +5,6 @@ Provides core functionality for Signal CLI registration and device linking
 """
 
 import subprocess
-import sys
 import time
 import os
 from typing import Optional, Tuple
@@ -130,6 +129,57 @@ class SignalCLICore:
             return False
         
         return True
+    
+    def check_signal_desktop_running(self) -> bool:
+        """Check if Signal Desktop is currently running on macOS"""
+        try:
+            # Use pgrep to check for Signal processes
+            result = subprocess.run(['pgrep', '-f', 'Signal.app'], 
+                                  capture_output=True, text=True, check=False)
+            return result.returncode == 0
+        except Exception:
+            # Fallback to ps aux if pgrep fails
+            try:
+                result = subprocess.run(['ps', 'aux'], 
+                                      capture_output=True, text=True, check=False)
+                return 'Signal.app' in result.stdout
+            except Exception:
+                # If both methods fail, assume Signal is not running
+                return False
+    
+    def quit_signal_desktop(self) -> bool:
+        """Attempt to quit Signal Desktop gracefully"""
+        try:
+            # First try using AppleScript to quit gracefully
+            subprocess.run([
+                'osascript', '-e', 'tell application "Signal" to quit'
+            ], capture_output=True, text=True, check=True)
+            
+            # Wait a moment for graceful quit
+            time.sleep(2)
+            
+            # Check if it actually quit
+            if not self.check_signal_desktop_running():
+                return True
+            
+            # If graceful quit didn't work, try force quit
+            result = subprocess.run(['pgrep', '-f', 'Signal.app'], 
+                                  capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                pids = result.stdout.strip().split('\n')
+                for pid in pids:
+                    if pid.strip():
+                        subprocess.run(['kill', pid.strip()], check=False)
+                
+                # Wait and check again
+                time.sleep(1)
+                return not self.check_signal_desktop_running()
+            
+            return True
+            
+        except Exception:
+            # If all else fails, return False
+            return False
     
     def extract_captcha_token(self, input_text: str) -> str:
         """Extract captcha token from various input formats"""

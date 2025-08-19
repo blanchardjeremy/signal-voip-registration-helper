@@ -159,6 +159,29 @@ class SignalCLIInterface:
                 break
             elif choice == "2":
                 mode = "addDevice"
+                # Check Signal Desktop status before proceeding
+                temp_config = RegistrationConfig(phone_number="+15551112222")  # temporary for check
+                temp_core = SignalCLICore(temp_config)
+                if temp_core.check_signal_desktop_running():
+                    print()
+                    print(self.ui.section_header("Signal Desktop Check", "⚠️"))
+                    print("Signal Desktop is currently running. For device linking to work properly,")
+                    print("Signal Desktop needs to be completely quit first.")
+                    print()
+                    
+                    choice = input("? Automatically quit Signal Desktop? (Y/n) › ").strip().lower()
+                    if choice in ['n', 'no']:
+                        print("  ❌ Signal Desktop must be quit to proceed with device linking.")
+                        print("  Please restart the script after quitting Signal Desktop.")
+                        sys.exit(1)
+                    
+                    print("  ⏳ Quitting Signal Desktop...")
+                    if temp_core.quit_signal_desktop():
+                        print("  ✅ Signal Desktop quit successfully")
+                    else:
+                        print("  ❌ Could not quit Signal Desktop automatically")
+                        print("     Please quit Signal Desktop manually (Cmd+Q) and restart the script")
+                        sys.exit(1)
                 break
             else:
                 print("  ❌ Please enter 1 or 2")
@@ -261,8 +284,8 @@ class SignalCLIInterface:
             if config.create_app:
                 app_name = config.app_name or config.phone_number.replace('+', '')
                 copy_status = "✓ Yes" if config.copy_to_applications else "○ No"
-                print(f"   App launch name: Signal-{app_name}")
                 print(f"   Copy to Apps:   {copy_status}")
+                print(f"   App name:       Signal-{app_name}")
         
         print()
         print("─" * 60)
@@ -537,6 +560,10 @@ class SignalCLIInterface:
         else:
             print("   • Use Signal Desktop normally")
         print("   • Your signal-cli remains the primary device")
+        print("   • Set a Signal PIN so no one else can register with this number")
+        print("   • Turn on disappearing messages by *default* (in Signal settings)")
+        print("   • Set a Signal username so you don't have to give out this phone number")
+        print("   • Optionally disable 'discover by phone number' for even more privacy")
     
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""

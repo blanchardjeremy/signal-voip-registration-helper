@@ -10,7 +10,7 @@ Don't use this to spam people.
 
 ## Features
 
-- **New Account Registration**: Register a new Signal account as a primary device. The primary "device" is signal-cli on your computer. Though you don't need to ever interact with it that way after you add it to the desktop.
+- **New Account Registration**: Register a new Signal account as a primary device. The primary "device" is operating through the `signal-cli` library on your computer, though you don't need to ever interact with it that way after you add it to the desktop.
 - **Link Signal Desktop**: Link Signal Desktop as a secondary device to an existing signal-cli account
 - **Captcha Support**: Handles Signal's captcha verification process
 
@@ -30,7 +30,7 @@ Don't use this to spam people.
 
 ## Usage
 
-## Step 1: Get a VOIP number
+## First, Get a VOIP number
 
 You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever nee dto re-verify it.
 
