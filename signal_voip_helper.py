@@ -559,11 +559,11 @@ class SignalCLIInterface:
                 print("   • Launch it anytime for Signal Desktop")
         else:
             print("   • Use Signal Desktop normally")
-        print("   • Your signal-cli remains the primary device")
-        print("   • Set a Signal PIN so no one else can register with this number")
+        print("   • You need to specify a profile display name in Signal Desktop settings so people know who is messaging them. This doesn't need to be your real name.")
         print("   • Turn on disappearing messages by *default* (in Signal settings)")
-        print("   • Set a Signal username so you don't have to give out this phone number")
+        print("   • Set a Signal username so you don't have to give out this phone number: https://support.signal.org/hc/en-us/articles/6712070553754-Phone-Number-Privacy-and-Usernames")
         print("   • Optionally disable 'discover by phone number' for even more privacy")
+        print("   • Set a Signal PIN so no one else can register with this number")
     
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""

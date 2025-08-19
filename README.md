@@ -39,6 +39,8 @@ You do need a real phone number, but you don't need a standard phone or mobile c
 - [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
 - [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
 
+**Note:** These won't be anonyomus numbers since your identity is required to set up each account.
+
 ### Interactive Wizard Mode (Recommended)
 
 ```bash
@@ -54,9 +56,6 @@ This will guide you through the setup process step by step.
 ```bash
 # With captcha token
 ./signal_voip_helper.py register +15551112222 --captcha <token>
-
-# With captcha token from file (recommended for long tokens)
-./signal_voip_helper.py register +15551112222 --captcha-file captcha.txt
 ```
 
 #### Link Signal Desktop as Secondary Device
@@ -68,13 +67,8 @@ This will guide you through the setup process step by step.
 ## Getting Captcha Tokens
 
 1. Open <https://signalcaptchas.org/registration/generate.html> in your browser
-2. Open Developer Tools (F12)
-3. Go to Console tab
-4. Solve the captcha
-5. Look for a line like: `'Launched external handler for "signalcaptcha://..."'`
-6. Copy the entire line or just the token part
-
-**Tip**: For very long captcha tokens, save them to a file and use the `--captcha-file` option.
+2. Solve the captcha`
+3. Right click on the "Open Signal" link and click "Copy link address"
 
 ## Examples
 
@@ -87,7 +81,7 @@ This will guide you through the setup process step by step.
 # 2. Choose option 1 (New account registration)
 # 3. Enter phone number
 # 4. Follow captcha instructions
-# 5. Enter verification code
+# 5. Enter verification code that you received via SMS
 # 6. Complete setup
 ```
 
@@ -98,8 +92,6 @@ This will guide you through the setup process step by step.
 ./signal_voip_helper.py addDevice +15551112222
 
 # 2. Follow instructions to scan QR code from Signal Desktop
-# 3. Enter the linking URI
-# 4. Complete device linking
 ```
 
 ## Troubleshooting
@@ -107,12 +99,11 @@ This will guide you through the setup process step by step.
 ### Common Issues
 
 1. **"signal-cli is not installed or not in PATH"**
-   - Install signal-cli following the instructions above
+   - Install `signal-cli` following the instructions above
    - Ensure it's in your system PATH
 
 2. **Verification code not received**
-   - Check your phone for SMS or voice call
-   - Wait up to 60 seconds for voice verification
+   - Check your phone for SMS
    - Ensure your phone number is correct
 
 3. **Device linking fails**
