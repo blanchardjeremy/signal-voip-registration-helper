@@ -363,7 +363,7 @@ class SignalCLICore:
         except Exception:
             return False
     
-    def register_new_account(self, captcha_token: str, verification_code: str, pin_code: Optional[str] = None) -> bool:
+    def register_new_account(self, captcha_token: str, verification_code: Optional[str] = None, pin_code: Optional[str] = None) -> bool:
         """Complete new account registration process"""
         self.check_signal_cli()
         
@@ -371,9 +371,17 @@ class SignalCLICore:
         if not self.register_sms(captcha_token):
             raise RegistrationFailedError("SMS registration failed")
         
-        # Verify the code
-        if not self.verify_registration(verification_code, pin_code):
-            raise VerificationFailedError("Registration verification failed")
+        # Check if the device is already successfully registered
+        if self.verify_account_registered():
+            print("✓ Device already registered successfully, skipping SMS verification")
+        else:
+            # Need SMS verification
+            if not verification_code:
+                raise VerificationFailedError("SMS verification code required but not provided")
+            
+            # Verify the code
+            if not self.verify_registration(verification_code, pin_code):
+                raise VerificationFailedError("Registration verification failed")
         
         # Test the registration
         test_success = self.test_registration()

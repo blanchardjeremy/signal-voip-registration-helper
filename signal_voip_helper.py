@@ -50,6 +50,7 @@ class UserConfig:
     app_name: Optional[str] = None
     copy_to_applications: bool = False
     device_name: str = "signal-cli-desktop"
+    needs_verification: bool = True  # Will be set dynamically during registration
 
 
 class ModernCLI:
@@ -212,11 +213,22 @@ class SignalCLIInterface:
         print()
         print("📋 Captcha Token Required:")
         print()
-        print("1. Open: https://signalcaptchas.org/registration/generate.html")
-        print("2. Solve the captcha")
-        print("3. Your existing Signal Desktop app will open, but you should close it.")
-        print("4. Right click on the 'Open Signal' link and click 'Copy link address'")
-        print("5. Paste the link address here")
+        print("Opening captcha page in your browser...")
+        
+        try:
+            import webbrowser
+            webbrowser.open("https://signalcaptchas.org/registration/generate.html")
+            print("✓ Captcha page opened in browser")
+        except Exception as e:
+            print(f"⚠️  Could not open browser automatically: {e}")
+            print("Please manually open: https://signalcaptchas.org/registration/generate.html")
+        
+        print()
+        print("Steps:")
+        print("1. Solve the captcha in your browser")
+        print("2. Your existing Signal Desktop app will open, but you should close it")
+        print("3. Right click on the 'Open Signal' link and click 'Copy link address'")
+        print("4. Come back here when you've copied the link")
         print()
         
         while True:
@@ -257,6 +269,8 @@ class SignalCLIInterface:
         print("? Do you have a registration PIN? (y/N) › ", end="")
         has_pin = input().strip().lower()
         if has_pin in ['y', 'yes']:
+            print()
+            print("💡 If using Google Voice, check your spam inbox for the PIN")
             config.pin_code = input(self.ui.input_prompt("Enter your PIN")).strip()
     
     def _collect_device_linking_config(self, config: UserConfig):
@@ -339,6 +353,8 @@ class SignalCLIInterface:
         
         confirm = input("? Ready to proceed with this configuration? (Y/n) › ").strip().lower()
         return confirm not in ['n', 'no']
+    
+
     
 
     def get_verification_code_with_context(self) -> str:
@@ -425,7 +441,8 @@ class SignalCLIInterface:
         steps = [
             "Checking signal-cli installation",
             "Initiating registration",
-            "Verification", 
+            "Checking registration status",
+            "Verification (if needed)", 
             "Testing setup",
             "Finalizing"
         ]
@@ -445,12 +462,23 @@ class SignalCLIInterface:
                         raise RegistrationFailedError("SMS registration failed")
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
-                elif step == "Verification":
-                    if not config.verification_code:
-                        print()  # Add newline before verification section
-                        config.verification_code = self.get_verification_code_with_context()
-                    self.core.verify_registration(config.verification_code, config.pin_code)
-                    print(f"{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
+                elif step == "Checking registration status":
+                    # Check if device is already registered after captcha submission
+                    config.needs_verification = not self.core.verify_account_registered()
+                    if config.needs_verification:
+                        print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)}) - SMS verification needed")
+                    else:
+                        print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)}) - already registered")
+                
+                elif step == "Verification (if needed)":
+                    if hasattr(config, 'needs_verification') and config.needs_verification:
+                        if not config.verification_code:
+                            print()  # Add newline before verification section
+                            config.verification_code = self.get_verification_code_with_context()
+                        self.core.verify_registration(config.verification_code, config.pin_code)
+                        print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
+                    else:
+                        print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)}) - skipped")
                 
                 elif step == "Testing setup":
                     if self.core.test_registration():
@@ -551,7 +579,7 @@ class SignalCLIInterface:
         self._show_device_linking_success(config, created_app_name)
     
     def _show_registration_success(self, config: UserConfig):
-        """Show registration success message"""
+        """Show registration success message and optionally continue with Signal Desktop setup"""
         self.ui.print_box("Success!", "✅ Signal CLI registered successfully!")
         print()
         print("🎯 What's next?")
@@ -560,6 +588,44 @@ class SignalCLIInterface:
         print(f"   signal-cli -a {config.phone_number} daemon     # Run continuously")
         print()
         print("💾 Account data stored in: ~/.local/share/signal-cli/data/")
+        print()
+        
+        # Ask if they want to set up Signal Desktop
+        try:
+            setup_desktop = input("? Would you like to set up Signal Desktop now? (Y/n) › ").strip().lower()
+            
+            if setup_desktop not in ['n', 'no']:
+                print()
+                print("🔄 Continuing with Signal Desktop setup...")
+                
+                # Create device linking config
+                device_config = UserConfig(
+                    phone_number=config.phone_number,
+                    operation_mode="addDevice"
+                )
+                
+                # Collect device linking configuration
+                self._collect_device_linking_config(device_config)
+                
+                # Show configuration summary for device linking
+                if not self.show_configuration_summary(device_config):
+                    print("✅ Signal Desktop setup cancelled. You can run this script again with 'addDevice' mode later.")
+                    return
+                
+                # Execute device linking
+                try:
+                    self._execute_device_linking(device_config)
+                except Exception as e:
+                    print(f"\n❌ Signal Desktop setup failed: {e}")
+                    print("✅ Registration is still complete! You can run this script again with 'addDevice' mode later.")
+            else:
+                print("✅ Registration complete! You can run this script again with 'addDevice' mode to set up Signal Desktop later.")
+                
+        except KeyboardInterrupt:
+            print("\n✅ Registration complete! You can run this script again with 'addDevice' mode to set up Signal Desktop later.")
+        except Exception as e:
+            print(f"\n⚠️  Error during Signal Desktop setup: {e}")
+            print("✅ Registration is still complete! You can run this script again with 'addDevice' mode later.")
     
     def _show_device_linking_success(self, config: UserConfig, created_app_name: Optional[str]):
         """Show device linking success message"""
