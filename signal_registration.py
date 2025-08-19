@@ -198,29 +198,6 @@ class SignalCLICore:
         
         return ""
     
-    def read_captcha_from_file(self, filename: str) -> str:
-        """Read captcha token from a file"""
-        try:
-            with open(filename, 'r') as f:
-                content = f.read().strip()
-            
-            if not content:
-                raise ValueError("File is empty")
-            
-            # Extract token from the content
-            captcha_token = self.extract_captcha_token(content)
-            if not captcha_token:
-                raise ValueError("Could not extract captcha token from file content")
-            
-            return captcha_token
-            
-        except FileNotFoundError:
-            raise ValueError(f"File '{filename}' not found")
-        except PermissionError:
-            raise ValueError(f"Permission denied reading file '{filename}'")
-        except Exception as e:
-            raise ValueError(f"Error reading file: {e}")
-    
     def register_sms(self, captcha_token: str) -> bool:
         """Register with SMS verification"""
         try:
@@ -232,19 +209,7 @@ class SignalCLICore:
         except subprocess.CalledProcessError:
             return False
     
-    def register_voice(self, captcha_token: str) -> bool:
-        """Register with voice call verification"""
-        # Wait 60 seconds before attempting voice verification
-        time.sleep(60)
-        
-        try:
-            subprocess.run([
-                'signal-cli', '-a', self.config.phone_number, 'register',
-                '--voice', '--captcha', f"signalcaptcha://{captcha_token}"
-            ], check=True)
-            return True
-        except subprocess.CalledProcessError:
-            return False
+
     
     def verify_registration(self, verification_code: str, pin_code: Optional[str] = None) -> bool:
         """Verify the registration with code and optional PIN"""
@@ -393,11 +358,9 @@ class SignalCLICore:
         """Complete new account registration process"""
         self.check_signal_cli()
         
-        # Try SMS registration first
+        # Register with SMS
         if not self.register_sms(captcha_token):
-            # If SMS fails, try voice
-            if not self.register_voice(captcha_token):
-                raise RegistrationFailedError("Both SMS and voice registration failed")
+            raise RegistrationFailedError("SMS registration failed")
         
         # Verify the code
         if not self.verify_registration(verification_code, pin_code):

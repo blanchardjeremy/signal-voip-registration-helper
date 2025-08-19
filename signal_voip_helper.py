@@ -334,7 +334,7 @@ class SignalCLIInterface:
         """Get verification code with context"""
         print(self.ui.section_header("Verification", "📱"))
         print("Check your phone for a 6-digit verification code")
-        print("(SMS or voice call)")
+        print("(SMS)")
         print()
         
         while True:
@@ -422,10 +422,7 @@ class SignalCLIInterface:
                 
                 elif step == "Initiating registration":
                     if not self.core.register_sms(config.captcha_token):
-                        print(f"\r{self.ui.progress_step(step, 'in_progress')} ({i}/{len(steps)}) - trying voice call...")
-                        time.sleep(2)  # Brief pause for better UX
-                        if not self.core.register_voice(config.captcha_token):
-                            raise RegistrationFailedError("Both SMS and voice registration failed")
+                        raise RegistrationFailedError("SMS registration failed")
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Verification":
