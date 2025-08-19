@@ -598,7 +598,7 @@ class SignalCLIInterface:
             sys.exit(1)
     
     def run_with_params(self, mode: str, phone_number: str, captcha_token: Optional[str] = None, 
-                       captcha_file: Optional[str] = None, device_name: str = "signal-cli-desktop"):
+                       device_name: str = "signal-cli-desktop"):
         """Run with command line parameters - using modern flow"""
         # Check dependencies first
         if not self.check_dependencies_upfront():
@@ -611,22 +611,10 @@ class SignalCLIInterface:
             captcha_token=captcha_token,
             device_name=device_name
         )
-        
-        # Handle captcha file if provided
-        if captcha_file and not captcha_token:
-            try:
-                # We need to create a core instance to read the file
-                self.config = RegistrationConfig(phone_number=phone_number, device_name=device_name)
-                self.core = SignalCLICore(self.config)
-                config.captcha_token = self.core.read_captcha_from_file(captcha_file)
-                print(f"✅ Captcha token loaded from file: {captcha_file}")
-            except ValueError as e:
-                print(f"❌ Error reading captcha file: {e}")
-                sys.exit(1)
+
         
         if mode == "register" and not config.captcha_token:
             print("❌ Error: Captcha token is required for registration")
-            print("Use --captcha <token> or --captcha-file <file>")
             sys.exit(1)
         
         try:
@@ -655,9 +643,6 @@ Examples:
   # Register new account with parameters
   python3 signal_voip_helper.py register +15551112222 --captcha <token>
 
-  # Register using captcha token from file (recommended for long tokens)
-  python3 signal_voip_helper.py register +15551112222 --captcha-file captcha.txt
-
   # Add Signal Desktop as linked device (addDevice)
   # Automatically reads QR code from screenshot, or manual URI input
   python3 signal_voip_helper.py addDevice +15551112222
@@ -665,7 +650,6 @@ Examples:
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
 2. Paste just the token part
-3. Save the token to a file and use --captcha-file (recommended for very long tokens)
         """
     )
     
@@ -674,7 +658,6 @@ Note: For captcha tokens, you can:
     parser.add_argument('phone_number', nargs='?', 
                        help='Phone number in international format (e.g., +15551112222)')
     parser.add_argument('--captcha', help='Captcha token for registration')
-    parser.add_argument('--captcha-file', help='File containing captcha token (alternative to --captcha)')
     parser.add_argument('--pin', help='Registration PIN (deprecated - will be prompted interactively)')
     parser.add_argument('--device-name', default='signal-cli-desktop',
                        help='Device name for linking (default: signal-cli-desktop)')
@@ -698,7 +681,6 @@ Note: For captcha tokens, you can:
         args.mode, 
         args.phone_number, 
         args.captcha,
-        args.captcha_file,
         args.device_name
     )
 

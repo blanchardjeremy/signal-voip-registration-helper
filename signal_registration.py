@@ -443,14 +443,10 @@ def get_captcha_instructions() -> str:
     """Get captcha token instructions"""
     return """=== Captcha Token Required ===
 1. Open this URL in your browser: https://signalcaptchas.org/registration/generate.html
-2. Open Developer Tools (F12)
-3. Go to Console tab
-4. Solve the captcha
-5. Look for a line like: 'Launched external handler for "signalcaptcha://..."'
-6. Copy the entire line or just the token part
-
-Note: If pasting the long token causes issues, try pasting it in smaller parts
-or save it to a file and use the --captcha-file option"""
+2. Solve the captcha
+3. Right click on the "Open Signal" link and click "Copy link address"
+4. Copy the entire line or just the token part
+"""
 
 
 def get_daemon_setup_info(phone_number: str, is_primary: bool = True) -> str:
