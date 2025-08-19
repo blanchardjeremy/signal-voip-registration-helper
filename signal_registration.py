@@ -204,10 +204,19 @@ class SignalCLICore:
             subprocess.run([
                 'signal-cli', '-a', self.config.phone_number, 'register',
                 '--captcha', f"signalcaptcha://{captcha_token}"
-            ], check=True)
+            ], check=True, capture_output=True, text=True)
             return True
-        except subprocess.CalledProcessError:
-            return False
+        except subprocess.CalledProcessError as e:
+            # Check for specific error types in stderr
+            error_output = e.stderr.lower() if e.stderr else ""
+            if "account is already registered" in error_output:
+                raise RegistrationFailedError(
+                    f"Account {self.config.phone_number} is already registered. "
+                    "If you regsitered it, use 'addDevice' mode to link Signal Desktop instead."
+                )
+            else:
+                # Generic registration failure
+                return False
     
 
     
@@ -407,8 +416,9 @@ def get_captcha_instructions() -> str:
     return """=== Captcha Token Required ===
 1. Open this URL in your browser: https://signalcaptchas.org/registration/generate.html
 2. Solve the captcha
-3. Right click on the "Open Signal" link and click "Copy link address"
-4. Copy the entire line or just the token part
+3. Your existing Signal Desktop app will open, but you should close it.
+4. Right click on the "Open Signal" link and click "Copy link address"
+5. Paste the link address here
 """
 
 

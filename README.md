@@ -69,6 +69,7 @@ This will guide you through the setup process step by step.
 1. Open <https://signalcaptchas.org/registration/generate.html> in your browser
 2. Solve the captcha`
 3. Right click on the "Open Signal" link and click "Copy link address"
+4. Paste the link address into the prompt
 
 ## Examples
 

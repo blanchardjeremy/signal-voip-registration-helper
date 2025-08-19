@@ -210,6 +210,50 @@ class SignalCLIInterface:
     def _collect_registration_config(self, config: UserConfig):
         """Collect registration-specific configuration"""
         print()
+        print("📋 Captcha Token Required:")
+        print()
+        print("1. Open: https://signalcaptchas.org/registration/generate.html")
+        print("2. Solve the captcha")
+        print("3. Your existing Signal Desktop app will open, but you should close it.")
+        print("4. Right click on the 'Open Signal' link and click 'Copy link address'")
+        print("5. Paste the link address here")
+        print()
+        
+        while True:
+            ready = input("? Have you copied the captcha token to your clipboard? (y/N) › ").strip().lower()
+            
+            if ready in ['y', 'yes']:
+                # Try to read from clipboard
+                try:
+                    import subprocess
+                    result = subprocess.run(['pbpaste'], capture_output=True, text=True, check=True)
+                    captcha_input = result.stdout.strip()
+                    
+                    if not captcha_input:
+                        print("  ❌ Clipboard is empty. Please copy the captcha token first.")
+                        continue
+                    
+                    print(f"  ✓ Read captcha token from clipboard ({len(captcha_input)} chars)")
+                    
+                    # Extract token
+                    if captcha_input.startswith('signalcaptcha://'):
+                        config.captcha_token = captcha_input[len('signalcaptcha://'):]
+                    elif 'signalcaptcha://' in captcha_input:
+                        start = captcha_input.find('signalcaptcha://') + len('signalcaptcha://')
+                        config.captcha_token = captcha_input[start:]
+                    else:
+                        config.captcha_token = captcha_input
+                    break
+                        
+                except Exception as e:
+                    print(f"  ❌ Could not read clipboard: {e}")
+                    print("  💡 Please copy the captcha token and try again")
+                    continue
+            else:
+                print("  💡 Please complete the captcha steps above and copy the token")
+                continue
+        
+        print()
         print("? Do you have a registration PIN? (y/N) › ", end="")
         has_pin = input().strip().lower()
         if has_pin in ['y', 'yes']:
@@ -275,8 +319,10 @@ class SignalCLIInterface:
         print(f"   Phone:          {config.phone_number}")
         
         if config.operation_mode == "register":
+            captcha_status = "✓ Yes" if config.captcha_token else "○ No"
             pin_status = "✓ Yes" if config.pin_code else "○ No"
-            print(f"   PIN:          {pin_status}")
+            print(f"   Captcha token:  {captcha_status}")
+            print(f"   PIN:            {pin_status}")
         
         if config.operation_mode == "addDevice":
             app_status = "✓ Yes" if config.create_app else "○ No"
@@ -294,42 +340,7 @@ class SignalCLIInterface:
         confirm = input("? Ready to proceed with this configuration? (Y/n) › ").strip().lower()
         return confirm not in ['n', 'no']
     
-    def get_captcha_token_with_instructions(self) -> str:
-        """Get captcha token with clear instructions"""
-        print(self.ui.section_header("Captcha Required", "🔒"))
-        print("You'll need to get a captcha token from Signal:")
-        print()
-        print("1. Open: https://signalcaptchas.org/registration/generate.html")
-        print("2. Open Developer Tools (F12)")
-        print("3. Go to Console tab")
-        print("4. Solve the captcha")
-        print("5. Look for: 'Launched external handler for \"signalcaptcha://...\"'")
-        print("6. Copy the entire line or just the token part")
-        print()
-        
-        while True:
-            try:
-                captcha_input = input("? Enter captcha token › ").strip()
-                if not captcha_input:
-                    print("  ❌ Captcha token cannot be empty")
-                    continue
-                
-                # Extract token (we'll need a core instance for this)
-                if captcha_input.startswith('signalcaptcha://'):
-                    return captcha_input[len('signalcaptcha://'):]
-                elif 'signalcaptcha://' in captcha_input:
-                    start = captcha_input.find('signalcaptcha://') + len('signalcaptcha://')
-                    return captcha_input[start:]
-                else:
-                    return captcha_input
-                    
-            except KeyboardInterrupt:
-                print("\n\n❌ Operation cancelled")
-                sys.exit(1)
-            except Exception as e:
-                print(f"  ❌ Input error: {e}")
-                continue
-    
+
     def get_verification_code_with_context(self) -> str:
         """Get verification code with context"""
         print(self.ui.section_header("Verification", "📱"))
@@ -368,6 +379,22 @@ class SignalCLIInterface:
         
         while True:
             uri = input("? Enter linking URI › ").strip()
+            
+            # Check if input might be truncated (common terminal buffer limit)
+            if len(uri) >= 1020 and not uri.endswith('='):
+                print("  💡 Input may be truncated. Trying to read from clipboard...")
+                try:
+                    import subprocess
+                    result = subprocess.run(['pbpaste'], capture_output=True, text=True, check=True)
+                    clipboard_content = result.stdout.strip()
+                    if clipboard_content and len(clipboard_content) > len(uri):
+                        print(f"  ✓ Using clipboard content ({len(clipboard_content)} chars)")
+                        uri = clipboard_content
+                    else:
+                        print("  ⚠️  Clipboard doesn't contain longer text, using typed input")
+                except Exception:
+                    print("  ⚠️  Could not read clipboard, using typed input")
+            
             if uri.startswith('sgnl://linkdevice?'):
                 return uri
             print("  ❌ URI should start with 'sgnl://linkdevice?'")
@@ -397,7 +424,6 @@ class SignalCLIInterface:
         """Execute registration with progress tracking"""
         steps = [
             "Checking signal-cli installation",
-            "Getting captcha token", 
             "Initiating registration",
             "Verification", 
             "Testing setup",
@@ -413,12 +439,6 @@ class SignalCLIInterface:
                     self.core = SignalCLICore(self.config)
                     self.core.check_signal_cli()
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
-                
-                elif step == "Getting captcha token":
-                    if not config.captcha_token:
-                        print()  # Add newline before captcha section
-                        config.captcha_token = self.get_captcha_token_with_instructions()
-                    print(f"{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Initiating registration":
                     if not self.core.register_sms(config.captcha_token):
