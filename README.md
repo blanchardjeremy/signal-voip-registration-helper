@@ -30,7 +30,7 @@ Don't use this to spam people.
 
 ## Usage
 
-## First, Get a VOIP number
+## First, get a VOIP number
 
 You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever nee dto re-verify it.
 
@@ -71,33 +71,7 @@ This will guide you through the setup process step by step.
 3. Right click on the "Open Signal" link and click "Copy link address"
 4. Paste the link address into the prompt
 
-## Examples
-
-### Complete Registration Flow
-
-```bash
-# 1. Run interactive wizard
-./signal_voip_helper.py
-
-# 2. Choose option 1 (New account registration)
-# 3. Enter phone number
-# 4. Follow captcha instructions
-# 5. Enter verification code that you received via SMS
-# 6. Complete setup
-```
-
-### Linking Signal Desktop
-
-```bash
-# 1. Run addDevice mode
-./signal_voip_helper.py addDevice +15551112222
-
-# 2. Follow instructions to scan QR code from Signal Desktop
-```
-
 ## Troubleshooting
-
-### Common Issues
 
 1. **"signal-cli is not installed or not in PATH"**
    - Install `signal-cli` following the instructions above
@@ -116,11 +90,12 @@ This will guide you through the setup process step by step.
 
 - Phone numbers and verification codes should be kept private
 - The script stores no sensitive data locally
+- No data is sent off your machine (except to interact directly with Signal's servers, of course)
 - All Signal data is stored in `~/.local/share/signal-cli/data/`
 
 ## License
 
-This script is provided as-is for educational and personal use. Please ensure you comply with Signal's terms of service and applicable laws when using this tool.
+See [LICENSE.txt](./LICENSE.txt) for license details.
 
 ## Contributing
 
