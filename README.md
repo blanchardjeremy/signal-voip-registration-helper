@@ -34,12 +34,13 @@ Don't use this to spam people.
 
    ```bash
    git clone https://github.com/blanchardjeremy/signal-voip-registration-helper
+   cd signal-voip-registration-helper
    ```
 
 2. Install dependencies via Homebrew:
 
    ```bash
-   brew install signal-cli zbarimg
+   brew install signal-cli zbar
    ```
 
 ## Usage
