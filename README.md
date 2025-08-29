@@ -1,18 +1,32 @@
 # Signal CLI Registration Script
 
-A helper script for registering new Signal accounts and linking to Signal Desktop. macOS support.
+A helper script for registering new Signal accounts **without a phone** and linking to Signal Desktop. Only works for macOS.
 
-This script was designed to help with the workflow of registering Google Voice or other VOIP numbers and attaching them to unique Signal Desktop instances, so you can run multiple Signal numbers from one profile.
+This script was designed to help with the workflow of registering Google Voice or other VOIP numbers that are not working on a physical phone and attaching them to unique Signal Desktop instances, so you can run multiple Signal numbers from one profile.
 
 **Warning:** This tool is new and hasn't been tested for long-term use. Please report bugs you encounter.
 
 Don't use this to spam people.
 
+## Who is this for?
+
+**This is for you if:**
+
+* You want to run multiple Signal accounts from your computer
+* You don't want to have to buy another phone just to run another Signal account
+* You don't need this Signal account to also be attached to a physical phone
+* You want a free/cheap Signal account
+
+**This tool is not for you if:**
+
+* You already have your Signal account registered to a physical phone. (I made a guide for just [creating a second Signal Desktop instance when you already have a phone as you primary device](https://github.com/blanchardjeremy/signal-voip-registration-helper/wiki/How-to-run-multiple-Signal-Desktop-instances-on-macOS)).
+
 ## Features
 
-- **New Account Registration**: Register a new Signal account as a primary device. The primary "device" is operating through the `signal-cli` library on your computer, though you don't need to ever interact with it that way after you add it to the desktop.
-- **Link Signal Desktop**: Link Signal Desktop as a secondary device to an existing signal-cli account
-- **Captcha Support**: Handles Signal's captcha verification process
+* **New Account Registration**: Register a new Signal account (without needing a physical phone). The primary "device" is actually just the [`signal-cli`](https://github.com/AsamK/signal-cli) library on your computer. However, after you link it to a Signal Desktop instance, you won't need to use `signal-cli` again.
+* **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
+* **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because you that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
+* **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
 
 ## Installation
 
@@ -36,8 +50,8 @@ You do need a real phone number, but you don't need a standard phone or mobile c
 
 **Where you can get a VOIP number:**
 
-- [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
-- [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
+* [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
+* [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
 
 **Note:** These won't be anonyomus numbers since your identity is required to set up each account.
 
@@ -74,24 +88,24 @@ This will guide you through the setup process step by step.
 ## Troubleshooting
 
 1. **"signal-cli is not installed or not in PATH"**
-   - Install `signal-cli` following the instructions above
-   - Ensure it's in your system PATH
+   * Install `signal-cli` following the instructions above
+   * Ensure it's in your system PATH
 
 2. **Verification code not received**
-   - Check your phone for SMS
-   - Ensure your phone number is correct
+   * Check your phone for SMS
+   * Ensure your phone number is correct
 
 3. **Device linking fails**
-   - Make sure the QR code hasn't expired
-   - Verify the linking URI starts with `sgnl://linkdevice?`
-   - Ensure you're running from the correct signal-cli account
+   * Make sure the QR code hasn't expired
+   * Verify the linking URI starts with `sgnl://linkdevice?`
+   * Ensure you're running from the correct signal-cli account
 
 ## Security Notes
 
-- Phone numbers and verification codes should be kept private
-- The script stores no sensitive data locally
-- No data is sent off your machine (except to interact directly with Signal's servers, of course)
-- All Signal data is stored in `~/.local/share/signal-cli/data/`
+* Phone numbers and verification codes should be kept private
+* The script stores no sensitive data locally
+* No data is sent off your machine (except to interact directly with Signal's servers, of course)
+* All Signal data is stored in `~/.local/share/signal-cli/data/`
 
 ## License
 
