@@ -45,7 +45,7 @@ Don't use this to spam people.
 
 ## Usage
 
-## First, get a VOIP number
+### First, get a VOIP number
 
 You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever nee dto re-verify it.
 
@@ -79,7 +79,7 @@ This will guide you through the setup process step by step.
 ./signal_voip_helper.py addDevice +15551112222
 ```
 
-## Getting Captcha Tokens
+### Getting Captcha Tokens
 
 1. Open <https://signalcaptchas.org/registration/generate.html> in your browser
 2. Solve the captcha`
