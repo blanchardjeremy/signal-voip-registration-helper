@@ -37,7 +37,7 @@ Don't use this to spam people.
    cd signal-voip-registration-helper
    ```
 
-2. Install dependencies via Homebrew:
+2. Install dependencies via Homebrew: (Make sure to [install Homebrew](https://brew.sh/) first)
 
    ```bash
    brew install signal-cli zbar
