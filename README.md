@@ -1,4 +1,4 @@
-# Signal CLI Registration Script
+# Signal VOIP Registration Script
 
 A helper script for registering new Signal accounts **without a phone** and linking to Signal Desktop. Only works for macOS.
 
