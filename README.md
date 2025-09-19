@@ -51,8 +51,14 @@ You do need a real phone number, but you don't need a standard phone or mobile c
 
 **Where you can get a VOIP number:**
 
+Reliable places to get a VOIP number:
+
 * [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
 * [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
+
+Other options:
+
+* [SMSPool](https://smspool.net/) - $0.20 per registration - Much cheapter to use if you need to register many accounts. ⚠️ _Use with caution as you only control this number temporarily and there is a chance it can be registered by someone else in the future._ The way to ensure you maintain control is to A) set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and enable Signal's [registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN#manage_registration_lock) feature and B) check the messages on this number at least once every 7 days. If you do both of those things, you should maintain control.
 
 **Note:** These won't be anonyomus numbers since your identity is required to set up each account.
 
