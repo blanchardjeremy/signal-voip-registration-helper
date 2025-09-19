@@ -43,11 +43,9 @@ Don't use this to spam people.
    brew install signal-cli zbar
    ```
 
-## Usage
+## Prerequsite: Get a VOIP number
 
-### First, get a VOIP number
-
-You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever need to re-verify it.
+To make a Signal account, you do need a phone number, but you _do not_ need to purchase a phone or pay for a standard cell phone plan in order to get that phone number. You can use a [VOIP](https://en.wikipedia.org/wiki/Voice_over_IP) number through a service like Google Voice or rent a phone number for a few minutes just to register the account. It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever need to re-verify it, but we provide less-reliable methods below as well.
 
 **Where you can get a VOIP number:**
 
@@ -56,12 +54,14 @@ _Note:_ These won't be anonymous numbers since your identity is required to set 
 * [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
 * [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
 
-**Less-reliable options for getting a VOIP number:**
+**Alternate: Less-reliable options for getting a VOIP number:**
 
 > [!WARNING]
 > Use the options below with caution because you only control this number temporarily and there is a chance it can be registered by someone else in the future. The way to ensure you maintain control is to A) set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and enable Signal's [registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN#manage_registration_lock) feature and B) check the messages on this number at least once every 7 days. If you do both of those things, you should maintain control.
 
 * [SMSPool](https://smspool.net/) - $0.20 per registration - Much cheaper to use if you need to register many accounts. For increased anonymity, you can purchase using Monero and access the site through Tor.
+
+## Usage
 
 ### Interactive Wizard Mode (Recommended)
 
