@@ -19,13 +19,13 @@ Don't use this to spam people.
 
 **This tool is not for you if:**
 
-* You already have your Signal account registered to a physical phone. (I made a guide for just [creating a second Signal Desktop instance when you already have a phone as you primary device](https://github.com/blanchardjeremy/signal-voip-registration-helper/wiki/How-to-run-multiple-Signal-Desktop-instances-on-macOS)).
+* You already have your Signal account registered to a physical phone. (I made a guide for just [creating a second Signal Desktop instance when you already have a phone as your primary device](https://github.com/blanchardjeremy/signal-voip-registration-helper/wiki/How-to-run-multiple-Signal-Desktop-instances-on-macOS)).
 
 ## Features
 
 * **New Account Registration**: Register a new Signal account (without needing a physical phone). The primary "device" is actually just the [`signal-cli`](https://github.com/AsamK/signal-cli) library on your computer. However, after you link it to a Signal Desktop instance, you won't need to use `signal-cli` again.
 * **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
-* **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because you that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
+* **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
 * **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
 
 ## Installation
@@ -47,20 +47,21 @@ Don't use this to spam people.
 
 ### First, get a VOIP number
 
-You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever nee dto re-verify it.
+You do need a real phone number, but you don't need a standard phone or mobile carrier (SIM or eSIM). It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever need to re-verify it.
 
 **Where you can get a VOIP number:**
 
-Reliable places to get a VOIP number:
+_Note:_ These won't be anonymous numbers since your identity is required to set up each account.
 
 * [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
 * [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
 
-Other options:
+**Less-reliable options for getting a VOIP number:**
 
-* [SMSPool](https://smspool.net/) - $0.20 per registration - Much cheapter to use if you need to register many accounts. ⚠️ _Use with caution as you only control this number temporarily and there is a chance it can be registered by someone else in the future._ The way to ensure you maintain control is to A) set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and enable Signal's [registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN#manage_registration_lock) feature and B) check the messages on this number at least once every 7 days. If you do both of those things, you should maintain control.
+> [!WARNING]
+> Use the options below with caution because you only control this number temporarily and there is a chance it can be registered by someone else in the future. The way to ensure you maintain control is to A) set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and enable Signal's [registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN#manage_registration_lock) feature and B) check the messages on this number at least once every 7 days. If you do both of those things, you should maintain control.
 
-**Note:** These won't be anonyomus numbers since your identity is required to set up each account.
+* [SMSPool](https://smspool.net/) - $0.20 per registration - Much cheaper to use if you need to register many accounts. For increased anonymity, you can purchase using Monero and access the site through Tor.
 
 ### Interactive Wizard Mode (Recommended)
 
@@ -88,7 +89,7 @@ This will guide you through the setup process step by step.
 ### Getting Captcha Tokens
 
 1. Open <https://signalcaptchas.org/registration/generate.html> in your browser
-2. Solve the captcha`
+2. Solve the captcha
 3. Right click on the "Open Signal" link and click "Copy link address"
 4. Paste the link address into the prompt
 
