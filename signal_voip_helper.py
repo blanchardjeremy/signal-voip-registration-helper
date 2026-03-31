@@ -294,12 +294,22 @@ class SignalCLIInterface:
                 continue
         
         print()
-        print("? Do you have a registration PIN? (y/N) › ", end="")
+        print(
+            "? Some carriers (e.g. Google Voice) send a separate PIN in SMS during "
+            "verification — not registration lock. Do you need to enter that SMS PIN "
+            "when you verify? (y/N) › ",
+            end="",
+        )
         has_pin = input().strip().lower()
-        if has_pin in ['y', 'yes']:
+        if has_pin in ["y", "yes"]:
             print()
-            print("💡 If using Google Voice, check your spam inbox for the PIN")
-            config.pin_code = input(self.ui.input_prompt("Enter your PIN")).strip()
+            print("💡 If using Google Voice, check your spam folder for that PIN")
+            config.pin_code = input(self.ui.input_prompt("Enter the SMS PIN")).strip()
+        print()
+        print(
+            "  (After signup, we’ll strongly encourage enabling registration lock — "
+            "a different PIN you set in signal-cli to protect the number.)"
+        )
     
     def _collect_device_linking_config(self, config: UserConfig):
         """Collect device linking configuration"""
@@ -384,7 +394,7 @@ class SignalCLIInterface:
             captcha_status = "✓ Yes" if config.captcha_token else "○ No"
             pin_status = "✓ Yes" if config.pin_code else "○ No"
             print(f"   Captcha token:  {captcha_status}")
-            print(f"   PIN:            {pin_status}")
+            print(f"   SMS verify PIN: {pin_status}  (if carrier sent one)")
         
         if config.operation_mode == "addDevice":
             app_status = "✓ Yes" if config.create_app else "○ No"
@@ -642,6 +652,9 @@ class SignalCLIInterface:
         print(f"   signal-cli -a {config.phone_number} daemon     # Run continuously")
         print()
         print("💾 Account data stored in: ~/.local/share/signal-cli/data/")
+        print()
+        
+        self._offer_registration_lock_pin(config)
         print()
         
         self._offer_install_receive_job(config.phone_number)
