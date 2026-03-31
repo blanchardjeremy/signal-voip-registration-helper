@@ -15,18 +15,16 @@ Early-stage tool. Don’t use it to spam.
 2. **Install, clone, and run the wizard** ([Homebrew](https://brew.sh/) required for `brew`):
 
    ```bash
-   # Install dependences (zbar is for QR scanning)
+   # Install (zbar is for QR scanning)
    brew install signal-cli zbar
-
-   # This repository
    git clone https://github.com/blanchardjeremy/signal-voip-registration-helper
    cd signal-voip-registration-helper
 
-   # Interactive setup (captcha, SMS, Desktop link, …)
+   # Interactive setup wizard
    ./signal_voip_helper.py
    ```
 
-The wizard walks you through captcha, SMS verification, optional launcher icon, copying the app to `~/Applications`, daily `signal-cli receive`, and linking Desktop (QR code).
+The wizard walks you through captcha, SMS verification, optional launcher icon, copying the app to `~/Applications`, daily `signal-cli receive`, turning on registration lock, and linking Desktop (QR code).
 
 **Captcha (registration):** open [signalcaptchas.org/registration/generate.html](https://signalcaptchas.org/registration/generate.html), solve it, right‑click **Open Signal** → **Copy link address**, paste when asked.
 
@@ -38,10 +36,9 @@ You need **some** number for Signal; it doesn’t have to be a cell plan. [VOIP]
 |--------|--------|
 | [Google Voice](https://workspace.google.com/products/voice/) | Free. The number can lapse if unused (Google Voice’s rules, not Signal’s). |
 | [MySudo](https://anonyome.com/individuals/mysudo/) | Paid tiers. |
+| [SMSPool](https://smspool.net/) (and similar) | Cheap temporary numbers. If you don't check it weekly, you could lose the number. If you use this route, set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) as prompted by the wizard.
 
-**Riskier (temporary numbers):** [SMSPool](https://smspool.net/) and similar — cheap, but you may not keep the number. If you use them, set a [Signal PIN + registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and check the number regularly, or someone else could register it later.
-
-## Command-line (skip the wizard)
+## Command-line manual uses (skip the wizard)
 
 ```bash
 ./signal_voip_helper.py register +15551112222 --captcha '<token>'
