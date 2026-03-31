@@ -417,6 +417,35 @@ class SignalCLICore:
         except subprocess.CalledProcessError:
             raise VerificationFailedError("Registration verification failed")
     
+    def set_registration_lock_pin(self, pin: str) -> None:
+        """
+        Enable Signal registration lock via: signal-cli setPin
+        (Stops new registrations on this number without the PIN; often easier than
+        enabling from a linked Signal Desktop profile.)
+        """
+        pin = pin.strip()
+        if len(pin) < 4:
+            raise SignalRegistrationError(
+                "Signal PINs must be at least 4 characters. Pick a stronger PIN."
+            )
+        try:
+            subprocess.run(
+                [
+                    "signal-cli",
+                    "-a",
+                    self.config.phone_number,
+                    "setPin",
+                    pin,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise SignalRegistrationError(
+                _format_signal_cli_failure("Could not set registration lock (setPin)", e)
+            ) from e
+    
     def test_registration(self) -> bool:
         """Test the registration by sending a test message"""
         try:
