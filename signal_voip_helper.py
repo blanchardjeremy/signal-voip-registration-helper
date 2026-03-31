@@ -8,6 +8,7 @@ import argparse
 import sys
 import os
 import time
+from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass, field
 
@@ -21,6 +22,7 @@ from signal_registration import (
     VerificationFailedError,
     DeviceLinkingError,
     SignalRegistrationError,
+    copy_signal_app_bundle_to_user_applications,
     get_captcha_instructions,
     get_daemon_setup_info,
 )
@@ -333,7 +335,9 @@ class SignalCLIInterface:
         
         if config.create_app:
             print()
-            copy_choice = input("? Copy launcher app to Applications folder? (Y/n) › ").strip().lower()
+            copy_choice = input(
+                "? Copy launcher app to your user Applications folder (~/Applications)? (Y/n) › "
+            ).strip().lower()
             config.copy_to_applications = copy_choice not in ['n', 'no']
             
             print()
@@ -388,7 +392,7 @@ class SignalCLIInterface:
             if config.create_app:
                 app_name = config.app_name or config.phone_number.replace('+', '')
                 copy_status = "✓ Yes" if config.copy_to_applications else "○ No"
-                print(f"   Copy to Apps:   {copy_status}")
+                print(f"   Copy to ~/Applications: {copy_status}")
                 print(f"   App name:       Signal-{app_name}")
                 print(
                     f"   Launcher icon:  {launcher_icon_label(config.launcher_icon_id)}"
@@ -612,11 +616,14 @@ class SignalCLIInterface:
                 
                 elif step == "Finalizing":
                     if created_app_name and config.copy_to_applications:
-                        print("  • Copying app to Applications...")
-                        if self.core.copy_app_to_applications(created_app_name):
-                            print(f"  • {created_app_name} copied to Applications")
+                        print("  • Copying app to ~/Applications...")
+                        ok_copy, copy_msg = self.core.copy_app_to_applications(
+                            created_app_name
+                        )
+                        if ok_copy:
+                            print(f"  • {copy_msg}")
                         else:
-                            print(f"  • Could not copy automatically")
+                            print(f"  • Could not copy: {copy_msg}")
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
             except Exception as e:
@@ -685,10 +692,13 @@ class SignalCLIInterface:
         print()
         if created_app_name:
             if config.copy_to_applications:
-                print(f"   • Launch {created_app_name} from Applications")
+                print(f"   • Launch {created_app_name} from ~/Applications")
                 print("   • Add to Dock for quick access")
             else:
-                print(f"   • Drag {created_app_name} to Applications folder")
+                print(
+                    f"   • Launcher is in this project folder (or run regenerateLauncher "
+                    f"with -o). Drag {created_app_name} to ~/Applications or /Applications if you like"
+                )
                 print("   • Launch it anytime for Signal Desktop")
         else:
             print("   • Use Signal Desktop normally")
@@ -771,6 +781,7 @@ class SignalCLIInterface:
         app_name: Optional[str] = None,
         icon_id: Optional[str] = None,
         output_dir: Optional[str] = None,
+        copy_to_user_applications: bool = False,
     ):
         """
         Rebuild the Signal Desktop .app launcher from an existing Signal-Profile-* folder.
@@ -872,12 +883,34 @@ class SignalCLIInterface:
             ).strip()
             app_name = an if an else None
 
-        builder.create_app_bundle(
+        app_path_str = builder.create_app_bundle(
             resolved_phone,
             output_dir=output_dir,
             app_name=app_name,
             icon_id=icon_id,
         )
+        bundle_name = Path(app_path_str).name
+        print()
+        print(f"✅ Built launcher: {app_path_str}")
+        print(
+            "   (By default this is the project folder, or the directory you set with -o.)"
+        )
+
+        do_copy = copy_to_user_applications
+        if not do_copy and interactive:
+            cp = input(
+                "? Copy this app to ~/Applications (easy to find in Finder)? (y/N) › "
+            ).strip().lower()
+            do_copy = cp in ("y", "yes")
+
+        if do_copy:
+            ok, msg = copy_signal_app_bundle_to_user_applications(
+                app_path_str, bundle_name
+            )
+            if ok:
+                print(f"✅ Copied to: {msg}")
+            else:
+                print(f"⚠️  Could not copy to ~/Applications: {msg}")
     
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""
@@ -968,6 +1001,7 @@ Examples:
   # Regenerate .app launcher from an existing Signal-Profile-* folder
   python3 signal_voip_helper.py regenerateLauncher
   python3 signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -o ~/Desktop
+  python3 signal_voip_helper.py regenerateLauncher +15551112222 --copy-to-user-applications
 
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
@@ -1013,6 +1047,11 @@ Note: For captcha tokens, you can:
         default=None,
         help='Regenerate launcher: icon from launcher_icons/ (interactive mode: optional)',
     )
+    parser.add_argument(
+        '--copy-to-user-applications',
+        action='store_true',
+        help='Regenerate launcher: copy the built .app to ~/Applications',
+    )
     
     args = parser.parse_args()
     
@@ -1029,6 +1068,7 @@ Note: For captcha tokens, you can:
             app_name=args.app_name,
             icon_id=args.launcher_icon,
             output_dir=args.launcher_output,
+            copy_to_user_applications=args.copy_to_user_applications,
         )
         return
     

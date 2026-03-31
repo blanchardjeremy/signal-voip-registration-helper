@@ -6,11 +6,13 @@ Provides core functionality for Signal CLI registration and device linking
 
 import json
 import re
+import shutil
 import subprocess
 import time
 import os
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
@@ -54,6 +56,37 @@ class AppConfig:
     app_name: Optional[str] = None
     output_dir: Optional[str] = None
     launcher_icon_id: Optional[str] = None
+
+
+def copy_signal_app_bundle_to_user_applications(
+    source_app_path: Optional[str],
+    app_bundle_name: str,
+) -> Tuple[bool, str]:
+    """
+    Copy a built .app into ~/Applications (per-user, no admin).
+    app_bundle_name should be e.g. Signal-15551234567.app
+    """
+    if not source_app_path:
+        return False, "No source path — build the launcher first."
+    src = Path(source_app_path)
+    if not src.is_dir():
+        return False, f"Source app not found: {src}"
+
+    dest_root = Path.home() / "Applications"
+    try:
+        dest_root.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return False, str(e)
+
+    dest = dest_root / app_bundle_name
+    try:
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+    except OSError as e:
+        return False, str(e)
+
+    return True, str(dest)
 
 
 class SignalRegistrationError(Exception):
@@ -497,21 +530,12 @@ class SignalCLICore:
         
         return app_path, app_name
     
-    def copy_app_to_applications(self, app_name: str) -> bool:
-        """Copy the created app to Applications folder"""
-        try:
-            import shutil
-            source_path = f"./{app_name}"
-            dest_path = f"/Applications/{app_name}"
-            
-            if os.path.exists(source_path):
-                shutil.copytree(source_path, dest_path)
-                return True
-            else:
-                return False
-                
-        except Exception:
-            return False
+    def copy_app_to_applications(self, app_name: str) -> Tuple[bool, str]:
+        """Copy the built .app to ~/Applications using the path from create_signal_app."""
+        return copy_signal_app_bundle_to_user_applications(
+            getattr(self, "created_app_path", None),
+            app_name,
+        )
     
     def register_new_account(self, captcha_token: str, verification_code: Optional[str] = None, pin_code: Optional[str] = None) -> bool:
         """Complete new account registration process"""

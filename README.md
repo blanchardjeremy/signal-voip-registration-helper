@@ -26,7 +26,7 @@ Don't use this to spam people.
 * **New Account Registration**: Register a new Signal account (without needing a physical phone). The primary "device" is actually just the [`signal-cli`](https://github.com/AsamK/signal-cli) library on your computer. However, after you link it to a Signal Desktop instance, you won't need to use `signal-cli` again.
 * **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
 * **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
-* **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
+* **Application launcher**: Create a `Signal-….app` that opens a unique Signal Desktop profile. The `.app` is written **next to this repo** by default (or use `-o`). When you link Desktop, you can choose to **copy it to `~/Applications`** (your user Applications folder — no admin). System `/Applications` is optional; drag there in Finder if you want it for all users.
 * **Daily message fetch (macOS)**: Optional background job so `signal-cli receive` runs on a schedule while you are logged in — helps keep the account and encryption material healthy without you thinking about it
 * **Regenerate launcher**: Rebuild the Signal Desktop `.app` shortcut for an existing profile under `~/Library/Application Support/Signal-Profile-<digits>/` (pick from a list or pass the phone number)
 
