@@ -10,7 +10,7 @@ import sys
 import argparse
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from launcher_icon_catalog import (
     LAUNCHER_ICON_CHOICES,
@@ -18,6 +18,47 @@ from launcher_icon_catalog import (
     is_valid_launcher_icon_id,
     launcher_icon_label,
 )
+
+
+def signal_application_support_dir() -> Path:
+    return Path.home() / "Library/Application Support"
+
+
+def discover_signal_profile_dirs() -> List[Path]:
+    """
+    Folders created by this helper / Signal Desktop: Signal-Profile-<digits>
+    under ~/Library/Application Support/.
+    """
+    base = signal_application_support_dir()
+    if not base.is_dir():
+        return []
+    out: List[Path] = []
+    prefix = "Signal-Profile-"
+    for p in base.iterdir():
+        if not p.is_dir() or not p.name.startswith(prefix):
+            continue
+        suffix = p.name[len(prefix) :]
+        if suffix.isdigit() and len(suffix) > 0:
+            out.append(p)
+    return sorted(out, key=lambda x: x.name)
+
+
+def profile_dir_to_phone_number(profile_dir: Path) -> str:
+    """Map Signal-Profile-<digits> to +<digits> E.164 string."""
+    name = profile_dir.name
+    prefix = "Signal-Profile-"
+    if not name.startswith(prefix):
+        raise ValueError(f"Expected folder like Signal-Profile-<digits>, got: {name}")
+    digits = name[len(prefix) :]
+    if not digits.isdigit():
+        raise ValueError(f"Invalid profile folder name: {name}")
+    return "+" + digits
+
+
+def profile_path_for_phone(phone_number: str) -> Path:
+    """Expected profile directory for a registered number."""
+    digits = "".join(c for c in phone_number if c.isdigit())
+    return signal_application_support_dir() / f"Signal-Profile-{digits}"
 
 
 class SignalAppBuilder:

@@ -27,6 +27,7 @@ from signal_registration import (
 from launcher_icon_catalog import (
     LAUNCHER_ICON_CHOICES,
     default_launcher_icon_id,
+    format_launcher_icon_menu_line,
     launcher_icon_label,
 )
 from signal_receive_job import (
@@ -43,7 +44,12 @@ except ImportError:
     QR_UTILS_AVAILABLE = False
 
 try:
-    from create_signal_launcher import SignalAppBuilder
+    from create_signal_launcher import (
+        SignalAppBuilder,
+        discover_signal_profile_dirs,
+        profile_dir_to_phone_number,
+        profile_path_for_phone,
+    )
     APP_BUILDER_AVAILABLE = True
 except ImportError:
     APP_BUILDER_AVAILABLE = False
@@ -343,8 +349,8 @@ class SignalCLIInterface:
 
             print()
             print("Launcher icon (Dock / Finder):")
-            for i, (_, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
-                print(f"  {i:2}. {label}")
+            for i, (slug, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
+                print(format_launcher_icon_menu_line(i, slug, label))
             n_icons = len(LAUNCHER_ICON_CHOICES)
             icon_pick = input(
                 f"? Choose icon 1–{n_icons} [1] › "
@@ -759,6 +765,120 @@ class SignalCLIInterface:
                 f"   Skipped. Install later: python3 signal_voip_helper.py installReceiveJob {phone_number}"
             )
     
+    def run_regenerate_launcher(
+        self,
+        phone: Optional[str] = None,
+        app_name: Optional[str] = None,
+        icon_id: Optional[str] = None,
+        output_dir: Optional[str] = None,
+    ):
+        """
+        Rebuild the Signal Desktop .app launcher from an existing Signal-Profile-* folder.
+        With no phone: lists profiles under Application Support to pick interactively.
+        """
+        interactive = not phone
+        if not APP_BUILDER_AVAILABLE:
+            print("❌ Launcher builder not available (create_signal_launcher).")
+            sys.exit(1)
+
+        builder = SignalAppBuilder()
+        if not builder.check_signal_installed():
+            sys.exit(1)
+
+        profiles = discover_signal_profile_dirs()
+        if not profiles:
+            print("❌ No Signal Desktop profile folders were found.")
+            print()
+            print("Looked under:")
+            print("  ~/Library/Application Support/Signal-Profile-<digits>")
+            print()
+            print(
+                "You need a profile here first. Register with the wizard or CLI "
+                "(register / addDevice), or use Signal Desktop with this helper’s "
+                "profile path once."
+            )
+            sys.exit(1)
+
+        resolved_phone: str
+        if not phone:
+            print(self.ui.section_header("Regenerate launcher", "🔧"))
+            print("Existing Signal Desktop profiles (pick one):")
+            print()
+            for i, p in enumerate(profiles, 1):
+                try:
+                    ph = profile_dir_to_phone_number(p)
+                except ValueError:
+                    continue
+                print(f"  {i:2}. {p.name}  →  {ph}")
+            print()
+            raw = input(f"? Enter 1–{len(profiles)} › ").strip()
+            try:
+                idx = int(raw) - 1
+                if idx < 0 or idx >= len(profiles):
+                    raise ValueError
+            except ValueError:
+                print("❌ Invalid choice.")
+                sys.exit(1)
+            chosen = profiles[idx]
+            resolved_phone = profile_dir_to_phone_number(chosen)
+        else:
+            if not phone.startswith("+"):
+                print("❌ Phone number must start with + (e.g. +15551234567)")
+                sys.exit(1)
+            expected = profile_path_for_phone(phone)
+            if not expected.is_dir():
+                print(f"❌ No profile folder for that number:")
+                print(f"   {expected}")
+                print()
+                print(
+                    "Register with the normal wizard or CLI first so this folder exists, "
+                    "or run regenerateLauncher with no phone number to pick from "
+                    "discovered profiles."
+                )
+                sys.exit(1)
+            resolved_phone = phone
+
+        if icon_id is None:
+            if interactive:
+                print()
+                print("Launcher icon:")
+                for i, (slug, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
+                    print(format_launcher_icon_menu_line(i, slug, label))
+                n = len(LAUNCHER_ICON_CHOICES)
+                ip = input(f"? Choose icon 1–{n} [1] › ").strip()
+                if not ip:
+                    icon_id = default_launcher_icon_id()
+                else:
+                    try:
+                        ii = int(ip) - 1
+                        icon_id = (
+                            LAUNCHER_ICON_CHOICES[ii][0]
+                            if 0 <= ii < n
+                            else default_launcher_icon_id()
+                        )
+                    except ValueError:
+                        icon_id = default_launcher_icon_id()
+            else:
+                icon_id = default_launcher_icon_id()
+
+        if app_name is None and interactive:
+            print()
+            digits = "".join(c for c in resolved_phone if c.isdigit())
+            an = input(
+                self.ui.input_prompt(
+                    "App name suffix (empty = use digits only)",
+                    f"Example: work → Signal-work.app (default: Signal-{digits}.app)",
+                )
+            ).strip()
+            app_name = an if an else None
+
+        builder.create_app_bundle(
+            resolved_phone,
+            output_dir=output_dir,
+            app_name=app_name,
+            icon_id=icon_id,
+        )
+    
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""
         self.show_welcome()
@@ -845,6 +965,10 @@ Examples:
   python3 signal_voip_helper.py installReceiveJob +15551112222
   python3 signal_voip_helper.py uninstallReceiveJob +15551112222
 
+  # Regenerate .app launcher from an existing Signal-Profile-* folder
+  python3 signal_voip_helper.py regenerateLauncher
+  python3 signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -o ~/Desktop
+
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
 2. Paste just the token part
@@ -859,8 +983,9 @@ Note: For captcha tokens, you can:
             'addDevice',
             'installReceiveJob',
             'uninstallReceiveJob',
+            'regenerateLauncher',
         ],
-        help='Operation mode (register, addDevice, or install/uninstall daily receive job)',
+        help='Operation mode (see epilog)',
     )
     parser.add_argument('phone_number', nargs='?', 
                        help='Phone number in international format (e.g., +15551112222)')
@@ -868,6 +993,26 @@ Note: For captcha tokens, you can:
     parser.add_argument('--pin', help='Registration PIN (deprecated - will be prompted interactively)')
     parser.add_argument('--device-name', default='signal-cli-desktop',
                        help='Device name for linking (default: signal-cli-desktop)')
+    parser.add_argument(
+        '--app-name',
+        '-n',
+        default=None,
+        metavar='NAME',
+        help='Regenerate launcher: custom app name suffix (e.g. work → Signal-work.app)',
+    )
+    parser.add_argument(
+        '--launcher-output',
+        '-o',
+        default=None,
+        metavar='DIR',
+        help='Regenerate launcher: output directory for the .app (default: current directory)',
+    )
+    parser.add_argument(
+        '--launcher-icon',
+        choices=[s for s, _ in LAUNCHER_ICON_CHOICES],
+        default=None,
+        help='Regenerate launcher: icon from launcher_icons/ (interactive mode: optional)',
+    )
     
     args = parser.parse_args()
     
@@ -876,6 +1021,15 @@ Note: For captcha tokens, you can:
     # If no arguments provided, run wizard mode
     if not args.mode:
         interface.run_modern_wizard()
+        return
+
+    if args.mode == "regenerateLauncher":
+        interface.run_regenerate_launcher(
+            phone=args.phone_number,
+            app_name=args.app_name,
+            icon_id=args.launcher_icon,
+            output_dir=args.launcher_output,
+        )
         return
     
     # Parameter mode

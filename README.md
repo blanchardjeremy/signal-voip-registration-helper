@@ -28,6 +28,7 @@ Don't use this to spam people.
 * **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
 * **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
 * **Daily message fetch (macOS)**: Optional background job so `signal-cli receive` runs on a schedule while you are logged in — helps keep the account and encryption material healthy without you thinking about it
+* **Regenerate launcher**: Rebuild the Signal Desktop `.app` shortcut for an existing profile under `~/Library/Application Support/Signal-Profile-<digits>/` (pick from a list or pass the phone number)
 
 ## Installation
 
@@ -86,6 +87,21 @@ This will guide you through the setup process step by step.
 ```bash
 ./signal_voip_helper.py addDevice +15551112222
 ```
+
+#### Regenerate the Desktop launcher (.app)
+
+If you already have a Signal profile folder but want a new shortcut (new icon, wrong name, deleted `.app`):
+
+```bash
+# Interactive: list Signal-Profile-* folders and pick one
+./signal_voip_helper.py regenerateLauncher
+
+# Non-interactive: must match an existing profile folder
+./signal_voip_helper.py regenerateLauncher +15551112222
+./signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -n work -o ~/Desktop
+```
+
+If there is no `~/Library/Application Support/Signal-Profile-<digits>/` for that number, register or link Desktop with this helper first.
 
 ### Daily background fetch (recommended on macOS)
 
