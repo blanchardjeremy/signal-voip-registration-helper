@@ -129,10 +129,9 @@ class SignalCLIInterface:
         self.ui.print_box("Signal Number Setup", "🚀 Let's set up your Signal number!")
     
     def check_dependencies_upfront(self) -> bool:
-        """Check all dependencies before starting the wizard"""
+        """Check brew tools and signal-cli (install + version) before any CLI-dependent prompts."""
         print(self.ui.section_header("Checking Dependencies", "🔍"))
         
-        # Create a temporary core instance to check dependencies
         temp_config = RegistrationConfig(phone_number="+15551112222")  # dummy number for check
         temp_core = SignalCLICore(temp_config)
         
@@ -140,7 +139,16 @@ class SignalCLIInterface:
             print("⚠️  Please install the missing dependencies and run the script again.")
             return False
         
-        print("✅ All required dependencies are installed!")
+        try:
+            temp_core.check_signal_cli()
+        except SignalCLINotFoundError as e:
+            print()
+            print(f"❌ {e}")
+            print()
+            print("⚠️  Fix the issue above and run the script again.")
+            return False
+        
+        print("✅ All required dependencies are installed (including a compatible signal-cli).")
         return True
     
     def collect_user_configuration(self) -> UserConfig:
@@ -458,8 +466,7 @@ class SignalCLIInterface:
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Initiating registration":
-                    if not self.core.register_sms(config.captcha_token):
-                        raise RegistrationFailedError("SMS registration failed")
+                    self.core.register_sms(config.captcha_token)
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Checking registration status":
