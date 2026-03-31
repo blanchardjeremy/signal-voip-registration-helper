@@ -112,9 +112,9 @@ Signal expects clients to **receive messages regularly**. If you only use Signal
 
 This repo can install a **per-user LaunchAgent** (not cron) that:
 
-- Runs **`signal-cli -a YOUR_NUMBER receive`** at **login** and about **twice per day** (9:00 and 21:00 local time) while your Mac is on and you are logged in
-- Writes logs under **`~/Library/Logs/signal-voip-registration-helper/`**
-- Stores its helper script under **`~/Library/Application Support/signal-voip-registration-helper/`** and the plist under **`~/Library/LaunchAgents/`**
+* Runs **`signal-cli -a YOUR_NUMBER receive`** at **login** and about **twice per day** (9:00 and 21:00 local time) while your Mac is on and you are logged in
+* Writes logs under **`~/Library/Logs/signal-voip-registration-helper/`**
+* Stores its helper script under **`~/Library/Application Support/signal-voip-registration-helper/`** and the plist under **`~/Library/LaunchAgents/`**
 
 **Interactive wizard:** after registration (or after linking Desktop), answer **Y** when asked to install the daily background job.
 
