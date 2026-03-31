@@ -5,12 +5,19 @@ Creates a .app file that launches Signal Desktop with a specific profile directo
 """
 
 import os
+import shutil
 import sys
 import argparse
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Optional
+
+from launcher_icon_catalog import (
+    LAUNCHER_ICON_CHOICES,
+    default_launcher_icon_id,
+    is_valid_launcher_icon_id,
+    launcher_icon_label,
+)
 
 
 class SignalAppBuilder:
@@ -28,10 +35,22 @@ class SignalAppBuilder:
     print(f"✅ Signal Desktop found at: {self.signal_app_path}")
     return True
   
-  def create_app_bundle(self, phone_number: str, output_dir: str = None, app_name: str = None) -> str:
-    """Create a .app bundle for launching Signal with specific profile"""
+  def create_app_bundle(
+    self,
+    phone_number: str,
+    output_dir: str = None,
+    app_name: str = None,
+    icon_id: Optional[str] = None,
+  ) -> str:
+    """Create a .app bundle for launching Signal with specific profile."""
     if not self.check_signal_installed():
       sys.exit(1)
+
+    if icon_id is None:
+      icon_id = default_launcher_icon_id()
+    elif not is_valid_launcher_icon_id(icon_id):
+      print(f"⚠️  Unknown launcher icon '{icon_id}', using '{default_launcher_icon_id()}'")
+      icon_id = default_launcher_icon_id()
     
     # Clean phone number for directory name
     profile_name = phone_number.replace('+', '').replace('-', '').replace(' ', '')
@@ -81,8 +100,7 @@ class SignalAppBuilder:
     # Make launcher executable
     os.chmod(launcher_path, 0o755)
     
-    # Copy Signal icon if available
-    self.copy_signal_icon(resources_dir)
+    self.copy_signal_icon(resources_dir, icon_id)
     
     print(f"✅ App bundle created: {app_bundle_path}")
     return str(app_bundle_path)
@@ -158,15 +176,24 @@ echo "✅ Starting Signal Desktop..."
 exec "$SIGNAL_APP" --user-data-dir="$USER_DATA_DIR"
 '''
   
-  def copy_signal_icon(self, resources_dir: Path):
-    """Copy Signal's icon to the app bundle if available"""
-    signal_icon_path = "/Applications/Signal.app/Contents/Resources/icon.icns"
+  def copy_signal_icon(self, resources_dir: Path, icon_id: str):
+    """Copy a pre-built launcher icon, or fall back to Signal’s stock icon.icns."""
     target_icon_path = resources_dir / "signal.icns"
-    
+    packaged = self.script_dir / "launcher_icons" / f"{icon_id}.icns"
+
+    if packaged.is_file():
+      try:
+        shutil.copy2(packaged, target_icon_path)
+        print(f"📎 Using launcher icon: {launcher_icon_label(icon_id)}")
+        return
+      except OSError as e:
+        print(f"⚠️  Could not copy packaged icon ({e}); trying Signal default…")
+
+    signal_icon_path = "/Applications/Signal.app/Contents/Resources/icon.icns"
     if os.path.exists(signal_icon_path):
       try:
-        subprocess.run(['cp', signal_icon_path, str(target_icon_path)], check=True)
-        print(f"📎 Copied Signal icon to app bundle")
+        subprocess.run(["cp", signal_icon_path, str(target_icon_path)], check=True)
+        print("📎 Copied Signal stock icon to app bundle")
       except subprocess.CalledProcessError:
         print("⚠️  Could not copy Signal icon (app will work without it)")
     else:
@@ -243,22 +270,25 @@ def main():
     epilog="""
 Examples:
   # Create app for phone number (default name)
-  python3 create_signal_app.py +15551112222
+  python3 create_signal_launcher.py +15551112222
   
   # Create app with custom name
-  python3 create_signal_app.py +15551112222 --name work
+  python3 create_signal_launcher.py +15551112222 --name work
+
+  # Use a tinted icon (see launcher_icons/)
+  python3 create_signal_launcher.py +15551112222 --icon rose
   
   # Create app with custom output directory
-  python3 create_signal_app.py +15551112222 --output ~/Desktop
+  python3 create_signal_launcher.py +15551112222 --output ~/Desktop
   
   # Create and test the app
-  python3 create_signal_app.py +15551112222 --test
+  python3 create_signal_launcher.py +15551112222 --test
   
   # Create and immediately launch the app
-  python3 create_signal_app.py +15551112222 --launch
+  python3 create_signal_launcher.py +15551112222 --launch
   
   # Just test an existing app
-  python3 create_signal_app.py --test-only Signal-work.app
+  python3 create_signal_launcher.py --test-only Signal-work.app
     """
   )
   
@@ -274,7 +304,13 @@ Examples:
                      help='Launch the app after creating it')
   parser.add_argument('--test-only',
                      help='Only test an existing app (provide app path)')
-  
+  parser.add_argument(
+    '--icon',
+    choices=[s for s, _ in LAUNCHER_ICON_CHOICES],
+    default=default_launcher_icon_id(),
+    help='Pre-built launcher icon color (from launcher_icons/)',
+  )
+
   args = parser.parse_args()
   
   builder = SignalAppBuilder()
@@ -307,8 +343,9 @@ Examples:
   else:
     print(f"🏗️  Creating Signal app for {args.phone_number}")
   
-  # Create the app
-  app_path = builder.create_app_bundle(args.phone_number, args.output, args.name)
+  app_path = builder.create_app_bundle(
+    args.phone_number, args.output, args.name, icon_id=args.icon
+  )
   
   # Test if requested
   if args.test:

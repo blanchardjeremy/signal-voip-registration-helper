@@ -14,6 +14,8 @@ import urllib.request
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
+from launcher_icon_catalog import default_launcher_icon_id
+
 # Used only when we cannot reach GitHub (offline, firewall, rate limit). Signal does
 # not publish a separate “minimum client” API; this is a conservative floor.
 FALLBACK_MIN_SIGNAL_CLI_VERSION = (0, 14, 0)
@@ -51,6 +53,7 @@ class AppConfig:
     phone_number: str
     app_name: Optional[str] = None
     output_dir: Optional[str] = None
+    launcher_icon_id: Optional[str] = None
 
 
 class SignalRegistrationError(Exception):
@@ -475,10 +478,12 @@ class SignalCLICore:
             raise SignalRegistrationError("SignalAppBuilder not available")
         
         builder = SignalAppBuilder()
+        icon_id = app_config.launcher_icon_id or default_launcher_icon_id()
         app_path = builder.create_app_bundle(
-            app_config.phone_number, 
+            app_config.phone_number,
             output_dir=app_config.output_dir,
-            app_name=app_config.app_name
+            app_name=app_config.app_name,
+            icon_id=icon_id,
         )
         
         phone_number_without_plus = app_config.phone_number.replace('+', '')

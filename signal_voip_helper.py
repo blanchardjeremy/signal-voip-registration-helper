@@ -9,12 +9,12 @@ import sys
 import os
 import time
 from typing import Optional, Tuple, List, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Import the core modules
 from signal_registration import (
-    SignalCLICore, 
-    RegistrationConfig, 
+    SignalCLICore,
+    RegistrationConfig,
     AppConfig,
     SignalCLINotFoundError,
     RegistrationFailedError,
@@ -22,7 +22,12 @@ from signal_registration import (
     DeviceLinkingError,
     SignalRegistrationError,
     get_captcha_instructions,
-    get_daemon_setup_info
+    get_daemon_setup_info,
+)
+from launcher_icon_catalog import (
+    LAUNCHER_ICON_CHOICES,
+    default_launcher_icon_id,
+    launcher_icon_label,
 )
 
 try:
@@ -48,6 +53,7 @@ class UserConfig:
     pin_code: Optional[str] = None
     create_app: bool = False
     app_name: Optional[str] = None
+    launcher_icon_id: str = field(default_factory=default_launcher_icon_id)
     copy_to_applications: bool = False
     device_name: str = "signal-cli-desktop"
     needs_verification: bool = True  # Will be set dynamically during registration
@@ -328,6 +334,24 @@ class SignalCLIInterface:
             
             if app_name:
                 config.app_name = app_name
+
+            print()
+            print("Launcher icon (Dock / Finder):")
+            for i, (_, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
+                print(f"  {i:2}. {label}")
+            n_icons = len(LAUNCHER_ICON_CHOICES)
+            icon_pick = input(
+                f"? Choose icon 1–{n_icons} [1] › "
+            ).strip()
+            if not icon_pick:
+                idx = 0
+            else:
+                try:
+                    n = int(icon_pick)
+                    idx = n - 1 if 0 <= n - 1 < n_icons else 0
+                except ValueError:
+                    idx = 0
+            config.launcher_icon_id = LAUNCHER_ICON_CHOICES[idx][0]
     
     def show_configuration_summary(self, config: UserConfig):
         """Show configuration summary before execution"""
@@ -354,6 +378,9 @@ class SignalCLIInterface:
                 copy_status = "✓ Yes" if config.copy_to_applications else "○ No"
                 print(f"   Copy to Apps:   {copy_status}")
                 print(f"   App name:       Signal-{app_name}")
+                print(
+                    f"   Launcher icon:  {launcher_icon_label(config.launcher_icon_id)}"
+                )
         
         print()
         print("─" * 60)
@@ -539,7 +566,8 @@ class SignalCLIInterface:
                     app_config = AppConfig(
                         phone_number=config.phone_number,
                         app_name=config.app_name,
-                        output_dir=None
+                        output_dir=None,
+                        launcher_icon_id=config.launcher_icon_id,
                     )
                     # Suppress verbose output from app creation
                     import sys
