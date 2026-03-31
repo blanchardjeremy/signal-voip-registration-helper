@@ -26,7 +26,9 @@ Don't use this to spam people.
 * **New Account Registration**: Register a new Signal account (without needing a physical phone). The primary "device" is actually just the [`signal-cli`](https://github.com/AsamK/signal-cli) library on your computer. However, after you link it to a Signal Desktop instance, you won't need to use `signal-cli` again.
 * **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
 * **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
-* **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
+* **Application launcher**: Create a `Signal-….app` that opens a unique Signal Desktop profile. The `.app` is written **next to this repo** by default (or use `-o`). When you link Desktop, you can choose to **copy it to `~/Applications`** (your user Applications folder — no admin). System `/Applications` is optional; drag there in Finder if you want it for all users.
+* **Daily message fetch (macOS)**: Optional background job so `signal-cli receive` runs on a schedule while you are logged in — helps keep the account and encryption material healthy without you thinking about it
+* **Regenerate launcher**: Rebuild the Signal Desktop `.app` shortcut for an existing profile under `~/Library/Application Support/Signal-Profile-<digits>/` (pick from a list or pass the phone number)
 
 ## Installation
 
@@ -85,6 +87,53 @@ This will guide you through the setup process step by step.
 ```bash
 ./signal_voip_helper.py addDevice +15551112222
 ```
+
+#### Regenerate the Desktop launcher (.app)
+
+If you already have a Signal profile folder but want a new shortcut (new icon, wrong name, deleted `.app`):
+
+```bash
+# Interactive: list Signal-Profile-* folders and pick one
+./signal_voip_helper.py regenerateLauncher
+
+# Non-interactive: must match an existing profile folder
+./signal_voip_helper.py regenerateLauncher +15551112222
+./signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -n work -o ~/Desktop
+./signal_voip_helper.py regenerateLauncher +15551112222 --copy-to-user-applications
+```
+
+The built `.app` lands in the project directory unless you pass `-o`. Use `--copy-to-user-applications` (or answer **y** when prompted in interactive mode) to copy it to **`~/Applications`**.
+
+If there is no `~/Library/Application Support/Signal-Profile-<digits>/` for that number, register or link Desktop with this helper first.
+
+### Daily background fetch (recommended on macOS)
+
+Signal expects clients to **receive messages regularly**. If you only use Signal Desktop and rarely touch `signal-cli`, scheduling an automatic fetch avoids stale sessions and related issues.
+
+This repo can install a **per-user LaunchAgent** (not cron) that:
+
+* Runs **`signal-cli -a YOUR_NUMBER receive`** at **login** and about **twice per day** (9:00 and 21:00 local time) while your Mac is on and you are logged in
+* Writes logs under **`~/Library/Logs/signal-voip-registration-helper/`**
+* Stores its helper script under **`~/Library/Application Support/signal-voip-registration-helper/`** and the plist under **`~/Library/LaunchAgents/`**
+
+**Interactive wizard:** after registration (or after linking Desktop), answer **Y** when asked to install the daily background job.
+
+**Command line:**
+
+```bash
+./signal_voip_helper.py installReceiveJob +15551234567
+./signal_voip_helper.py uninstallReceiveJob +15551234567
+```
+
+**If the Mac was asleep** at a scheduled time, launchd runs the job at the next interval or the next login (`RunAtLoad`). This is meant to be “good enough” for a desktop that is used regularly; it is not a 24/7 server guarantee.
+
+**Where to find the files:** In Finder, **Go → Go to Folder…** (`⇧⌘G`) and paste:
+`~/Library/Application Support/signal-voip-registration-helper/`
+(the `Library` folder is hidden by default in your home directory.)
+
+If the plist exists but **`receive-….sh` is missing**, run `installReceiveJob` again — it recreates the script without duplicating the job.
+
+**Uninstall:** use `uninstallReceiveJob` above, or delete the matching `org.signal.voip-helper.receive.*.plist` in `~/Library/LaunchAgents/` and remove the `receive-*.sh` script from Application Support, then run `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.signal.voip-helper.receive.<digits>.plist` if the agent was loaded.
 
 ### Getting Captcha Tokens
 

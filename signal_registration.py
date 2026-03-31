@@ -4,11 +4,28 @@ Signal CLI Registration Core Module
 Provides core functionality for Signal CLI registration and device linking
 """
 
+import json
+import re
+import shutil
 import subprocess
 import time
 import os
+import urllib.error
+import urllib.request
+from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
+
+from launcher_icon_catalog import default_launcher_icon_id
+
+# Used only when we cannot reach GitHub (offline, firewall, rate limit). Signal does
+# not publish a separate “minimum client” API; this is a conservative floor.
+FALLBACK_MIN_SIGNAL_CLI_VERSION = (0, 14, 0)
+
+_GITHUB_SIGNAL_CLI_LATEST = (
+    "https://api.github.com/repos/AsamK/signal-cli/releases/latest"
+)
+_GITHUB_API_TIMEOUT_SEC = 10
 
 # Import optional dependencies
 try:
@@ -38,6 +55,38 @@ class AppConfig:
     phone_number: str
     app_name: Optional[str] = None
     output_dir: Optional[str] = None
+    launcher_icon_id: Optional[str] = None
+
+
+def copy_signal_app_bundle_to_user_applications(
+    source_app_path: Optional[str],
+    app_bundle_name: str,
+) -> Tuple[bool, str]:
+    """
+    Copy a built .app into ~/Applications (per-user, no admin).
+    app_bundle_name should be e.g. Signal-15551234567.app
+    """
+    if not source_app_path:
+        return False, "No source path — build the launcher first."
+    src = Path(source_app_path)
+    if not src.is_dir():
+        return False, f"Source app not found: {src}"
+
+    dest_root = Path.home() / "Applications"
+    try:
+        dest_root.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return False, str(e)
+
+    dest = dest_root / app_bundle_name
+    try:
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+    except OSError as e:
+        return False, str(e)
+
+    return True, str(dest)
 
 
 class SignalRegistrationError(Exception):
@@ -65,6 +114,93 @@ class DeviceLinkingError(SignalRegistrationError):
     pass
 
 
+def _parse_signal_cli_version(text: str) -> Optional[Tuple[int, int, int]]:
+    """Parse x.y.z from signal-cli --version output."""
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
+    if not m:
+        return None
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+
+
+def fetch_latest_signal_cli_version_from_github() -> Optional[Tuple[int, int, int]]:
+    """
+    Latest upstream signal-cli from GitHub Releases (not a Signal API).
+
+    Signal's servers do not document a public endpoint to ask “will this client
+    version be rejected”; they return HTTP 499 on real requests. Comparing to the
+    current signal-cli release is the usual way to stay ahead of DeprecatedVersion.
+    """
+    req = urllib.request.Request(
+        _GITHUB_SIGNAL_CLI_LATEST,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "signal-voip-registration-helper",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_GITHUB_API_TIMEOUT_SEC) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        tag = data.get("tag_name") or ""
+        return _parse_signal_cli_version(tag)
+    except (
+        urllib.error.URLError,
+        json.JSONDecodeError,
+        TimeoutError,
+        OSError,
+        ValueError,
+    ):
+        return None
+
+
+def _signal_cli_deprecated_server_hint(stderr: str, stdout: str) -> str:
+    combined = (stderr + "\n" + stdout).lower()
+    if "deprecatedversionexception" in combined or "statuscode: 499" in combined:
+        return (
+            "\n\n"
+            "Signal is rejecting this signal-cli build as too old. "
+            "Upgrade and try again:\n"
+            "  brew upgrade signal-cli\n"
+            "Releases: https://github.com/AsamK/signal-cli/releases/latest"
+        )
+    return ""
+
+
+def _format_signal_cli_failure(
+    context: str,
+    exc: subprocess.CalledProcessError,
+    max_chars: int = 6000,
+) -> str:
+    """Build a user-visible message from a failed signal-cli subprocess."""
+    stderr = (exc.stderr or "").strip()
+    stdout = (exc.stdout or "").strip()
+    lines = [
+        f"{context} (signal-cli exited with code {exc.returncode}).",
+        "",
+    ]
+    if not stderr and not stdout:
+        lines.append(
+            "signal-cli produced no output on stdout or stderr. "
+            "Try running the same command in a terminal to see errors."
+        )
+        return "\n".join(lines)
+
+    if stderr:
+        lines.append("stderr:")
+        lines.append(stderr)
+    if stdout:
+        if stderr:
+            lines.append("")
+        lines.append("stdout:")
+        lines.append(stdout)
+    msg = "\n".join(lines)
+    if len(msg) > max_chars:
+        msg = msg[: max_chars - 50] + "\n... (truncated)"
+    msg += _signal_cli_deprecated_server_hint(stderr, stdout)
+    return msg
+
+
 class SignalCLICore:
     """Core Signal CLI registration functionality without user interactions"""
     
@@ -74,17 +210,62 @@ class SignalCLICore:
         self.created_app_path = None
     
     def check_signal_cli(self) -> bool:
-        """Check if signal-cli is installed and accessible"""
+        """Check if signal-cli is installed, usable, and recent enough for Signal servers."""
         try:
-            subprocess.run(['signal-cli', '--version'], 
-                          capture_output=True, text=True, check=True)
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
+            result = subprocess.run(
+                ["signal-cli", "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except FileNotFoundError:
             raise SignalCLINotFoundError(
                 "signal-cli is not installed or not in PATH. "
-                "Please install signal-cli first: "
-                "wget https://github.com/AsamK/signal-cli/releases/latest"
+                "Install it first, e.g.:\n"
+                "  brew install signal-cli\n"
+                "Or: https://github.com/AsamK/signal-cli/releases/latest"
+            ) from None
+        except subprocess.CalledProcessError as e:
+            raise SignalCLINotFoundError(
+                _format_signal_cli_failure(
+                    "signal-cli --version failed (is signal-cli installed correctly?)", e
+                )
+            ) from e
+
+        combined = (result.stdout or "") + "\n" + (result.stderr or "")
+        parsed = _parse_signal_cli_version(combined)
+        if parsed is None:
+            raise SignalCLINotFoundError(
+                "Could not read signal-cli version from:\n"
+                + combined.strip()
+                + "\n\nReinstall signal-cli from https://github.com/AsamK/signal-cli/releases/latest"
             )
+
+        remote = fetch_latest_signal_cli_version_from_github()
+        if remote is not None:
+            if parsed < remote:
+                r0, r1, r2 = remote
+                raise SignalCLINotFoundError(
+                    f"signal-cli {parsed[0]}.{parsed[1]}.{parsed[2]} is behind the current "
+                    f"release ({r0}.{r1}.{r2} per GitHub). Older builds are often rejected by "
+                    "Signal with HTTP 499 (DeprecatedVersionException).\n\n"
+                    "Upgrade:\n"
+                    "  brew upgrade signal-cli\n\n"
+                    "Or: https://github.com/AsamK/signal-cli/releases/latest"
+                )
+        else:
+            if parsed < FALLBACK_MIN_SIGNAL_CLI_VERSION:
+                maj, mino, pat = FALLBACK_MIN_SIGNAL_CLI_VERSION
+                raise SignalCLINotFoundError(
+                    f"signal-cli {parsed[0]}.{parsed[1]}.{parsed[2]} may be too old. "
+                    "Could not reach GitHub to check the latest release; using a bundled "
+                    f"minimum of {maj}.{mino}.{pat}.\n\n"
+                    "Upgrade when online:\n"
+                    "  brew upgrade signal-cli\n\n"
+                    "Or: https://github.com/AsamK/signal-cli/releases/latest"
+                )
+
+        return True
     
     def check_qr_utilities(self) -> bool:
         """Check if QR utilities are available and working"""
@@ -199,7 +380,7 @@ class SignalCLICore:
         return ""
     
     def register_sms(self, captcha_token: str) -> bool:
-        """Register with SMS verification"""
+        """Register with SMS verification. Raises RegistrationFailedError on failure."""
         try:
             subprocess.run([
                 'signal-cli', '-a', self.config.phone_number, 'register',
@@ -207,16 +388,16 @@ class SignalCLICore:
             ], check=True, capture_output=True, text=True)
             return True
         except subprocess.CalledProcessError as e:
-            # Check for specific error types in stderr
-            error_output = e.stderr.lower() if e.stderr else ""
-            if "account is already registered" in error_output:
+            err = (e.stderr or "") + "\n" + (e.stdout or "")
+            err_lower = err.lower()
+            if "account is already registered" in err_lower:
                 raise RegistrationFailedError(
                     f"Account {self.config.phone_number} is already registered. "
-                    "If you regsitered it, use 'addDevice' mode to link Signal Desktop instead."
-                )
-            else:
-                # Generic registration failure
-                return False
+                    "If you registered it, use 'addDevice' mode to link Signal Desktop instead."
+                ) from e
+            raise RegistrationFailedError(
+                _format_signal_cli_failure("SMS registration failed", e)
+            ) from e
     
 
     
@@ -330,10 +511,12 @@ class SignalCLICore:
             raise SignalRegistrationError("SignalAppBuilder not available")
         
         builder = SignalAppBuilder()
+        icon_id = app_config.launcher_icon_id or default_launcher_icon_id()
         app_path = builder.create_app_bundle(
-            app_config.phone_number, 
+            app_config.phone_number,
             output_dir=app_config.output_dir,
-            app_name=app_config.app_name
+            app_name=app_config.app_name,
+            icon_id=icon_id,
         )
         
         phone_number_without_plus = app_config.phone_number.replace('+', '')
@@ -347,29 +530,19 @@ class SignalCLICore:
         
         return app_path, app_name
     
-    def copy_app_to_applications(self, app_name: str) -> bool:
-        """Copy the created app to Applications folder"""
-        try:
-            import shutil
-            source_path = f"./{app_name}"
-            dest_path = f"/Applications/{app_name}"
-            
-            if os.path.exists(source_path):
-                shutil.copytree(source_path, dest_path)
-                return True
-            else:
-                return False
-                
-        except Exception:
-            return False
+    def copy_app_to_applications(self, app_name: str) -> Tuple[bool, str]:
+        """Copy the built .app to ~/Applications using the path from create_signal_app."""
+        return copy_signal_app_bundle_to_user_applications(
+            getattr(self, "created_app_path", None),
+            app_name,
+        )
     
     def register_new_account(self, captcha_token: str, verification_code: Optional[str] = None, pin_code: Optional[str] = None) -> bool:
         """Complete new account registration process"""
         self.check_signal_cli()
         
-        # Register with SMS
-        if not self.register_sms(captcha_token):
-            raise RegistrationFailedError("SMS registration failed")
+        # Register with SMS (raises RegistrationFailedError with details on failure)
+        self.register_sms(captcha_token)
         
         # Check if the device is already successfully registered
         if self.verify_account_registered():
@@ -435,14 +608,16 @@ def get_daemon_setup_info(phone_number: str, is_primary: bool = True) -> str:
     if is_primary:
         return f"""=== Important: Regular Message Receiving ===
 Signal protocol requires regular message receiving for proper encryption.
-You should regularly run:
+
+On macOS with this helper, the easiest option is the built-in daily job:
+  python3 signal_voip_helper.py installReceiveJob {phone_number}
+(Or say yes when the wizard offers it after registration.)
+
+You can also run manually:
   signal-cli -a {phone_number} receive
 
-For continuous operation, you can run the daemon:
-  signal-cli -a {phone_number} daemon
-
-Or set up a simple cron job (every 5 minutes):
-*/5 * * * * signal-cli -a {phone_number} receive"""
+For continuous operation:
+  signal-cli -a {phone_number} daemon"""
     else:
         return """=== Linked Device Setup Complete ===
 Your device is now linked! For ongoing use, you can:

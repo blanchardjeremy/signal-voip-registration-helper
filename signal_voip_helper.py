@@ -8,21 +8,35 @@ import argparse
 import sys
 import os
 import time
+from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Import the core modules
 from signal_registration import (
-    SignalCLICore, 
-    RegistrationConfig, 
+    SignalCLICore,
+    RegistrationConfig,
     AppConfig,
     SignalCLINotFoundError,
     RegistrationFailedError,
     VerificationFailedError,
     DeviceLinkingError,
     SignalRegistrationError,
+    copy_signal_app_bundle_to_user_applications,
     get_captcha_instructions,
-    get_daemon_setup_info
+    get_daemon_setup_info,
+)
+from launcher_icon_catalog import (
+    LAUNCHER_ICON_CHOICES,
+    default_launcher_icon_id,
+    format_launcher_icon_menu_line,
+    launcher_icon_label,
+)
+from signal_receive_job import (
+    install_receive_job,
+    is_receive_job_installed,
+    needs_receive_job_repair,
+    uninstall_receive_job,
 )
 
 try:
@@ -32,7 +46,12 @@ except ImportError:
     QR_UTILS_AVAILABLE = False
 
 try:
-    from create_signal_launcher import SignalAppBuilder
+    from create_signal_launcher import (
+        SignalAppBuilder,
+        discover_signal_profile_dirs,
+        profile_dir_to_phone_number,
+        profile_path_for_phone,
+    )
     APP_BUILDER_AVAILABLE = True
 except ImportError:
     APP_BUILDER_AVAILABLE = False
@@ -48,6 +67,7 @@ class UserConfig:
     pin_code: Optional[str] = None
     create_app: bool = False
     app_name: Optional[str] = None
+    launcher_icon_id: str = field(default_factory=default_launcher_icon_id)
     copy_to_applications: bool = False
     device_name: str = "signal-cli-desktop"
     needs_verification: bool = True  # Will be set dynamically during registration
@@ -129,10 +149,9 @@ class SignalCLIInterface:
         self.ui.print_box("Signal Number Setup", "🚀 Let's set up your Signal number!")
     
     def check_dependencies_upfront(self) -> bool:
-        """Check all dependencies before starting the wizard"""
+        """Check brew tools and signal-cli (install + version) before any CLI-dependent prompts."""
         print(self.ui.section_header("Checking Dependencies", "🔍"))
         
-        # Create a temporary core instance to check dependencies
         temp_config = RegistrationConfig(phone_number="+15551112222")  # dummy number for check
         temp_core = SignalCLICore(temp_config)
         
@@ -140,7 +159,16 @@ class SignalCLIInterface:
             print("⚠️  Please install the missing dependencies and run the script again.")
             return False
         
-        print("✅ All required dependencies are installed!")
+        try:
+            temp_core.check_signal_cli()
+        except SignalCLINotFoundError as e:
+            print()
+            print(f"❌ {e}")
+            print()
+            print("⚠️  Fix the issue above and run the script again.")
+            return False
+        
+        print("✅ All required dependencies are installed (including a compatible signal-cli).")
         return True
     
     def collect_user_configuration(self) -> UserConfig:
@@ -307,7 +335,9 @@ class SignalCLIInterface:
         
         if config.create_app:
             print()
-            copy_choice = input("? Copy launcher app to Applications folder? (Y/n) › ").strip().lower()
+            copy_choice = input(
+                "? Copy launcher app to your user Applications folder (~/Applications)? (Y/n) › "
+            ).strip().lower()
             config.copy_to_applications = copy_choice not in ['n', 'no']
             
             print()
@@ -320,6 +350,24 @@ class SignalCLIInterface:
             
             if app_name:
                 config.app_name = app_name
+
+            print()
+            print("Launcher icon (Dock / Finder):")
+            for i, (slug, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
+                print(format_launcher_icon_menu_line(i, slug, label))
+            n_icons = len(LAUNCHER_ICON_CHOICES)
+            icon_pick = input(
+                f"? Choose icon 1–{n_icons} [1] › "
+            ).strip()
+            if not icon_pick:
+                idx = 0
+            else:
+                try:
+                    n = int(icon_pick)
+                    idx = n - 1 if 0 <= n - 1 < n_icons else 0
+                except ValueError:
+                    idx = 0
+            config.launcher_icon_id = LAUNCHER_ICON_CHOICES[idx][0]
     
     def show_configuration_summary(self, config: UserConfig):
         """Show configuration summary before execution"""
@@ -344,8 +392,11 @@ class SignalCLIInterface:
             if config.create_app:
                 app_name = config.app_name or config.phone_number.replace('+', '')
                 copy_status = "✓ Yes" if config.copy_to_applications else "○ No"
-                print(f"   Copy to Apps:   {copy_status}")
+                print(f"   Copy to ~/Applications: {copy_status}")
                 print(f"   App name:       Signal-{app_name}")
+                print(
+                    f"   Launcher icon:  {launcher_icon_label(config.launcher_icon_id)}"
+                )
         
         print()
         print("─" * 60)
@@ -458,8 +509,7 @@ class SignalCLIInterface:
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Initiating registration":
-                    if not self.core.register_sms(config.captcha_token):
-                        raise RegistrationFailedError("SMS registration failed")
+                    self.core.register_sms(config.captcha_token)
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
                 elif step == "Checking registration status":
@@ -532,7 +582,8 @@ class SignalCLIInterface:
                     app_config = AppConfig(
                         phone_number=config.phone_number,
                         app_name=config.app_name,
-                        output_dir=None
+                        output_dir=None,
+                        launcher_icon_id=config.launcher_icon_id,
                     )
                     # Suppress verbose output from app creation
                     import sys
@@ -565,11 +616,14 @@ class SignalCLIInterface:
                 
                 elif step == "Finalizing":
                     if created_app_name and config.copy_to_applications:
-                        print("  • Copying app to Applications...")
-                        if self.core.copy_app_to_applications(created_app_name):
-                            print(f"  • {created_app_name} copied to Applications")
+                        print("  • Copying app to ~/Applications...")
+                        ok_copy, copy_msg = self.core.copy_app_to_applications(
+                            created_app_name
+                        )
+                        if ok_copy:
+                            print(f"  • {copy_msg}")
                         else:
-                            print(f"  • Could not copy automatically")
+                            print(f"  • Could not copy: {copy_msg}")
                     print(f"\r{self.ui.progress_step(step, 'completed')} ({i}/{len(steps)})")
                 
             except Exception as e:
@@ -588,6 +642,9 @@ class SignalCLIInterface:
         print(f"   signal-cli -a {config.phone_number} daemon     # Run continuously")
         print()
         print("💾 Account data stored in: ~/.local/share/signal-cli/data/")
+        print()
+        
+        self._offer_install_receive_job(config.phone_number)
         print()
         
         # Ask if they want to set up Signal Desktop
@@ -635,10 +692,13 @@ class SignalCLIInterface:
         print()
         if created_app_name:
             if config.copy_to_applications:
-                print(f"   • Launch {created_app_name} from Applications")
+                print(f"   • Launch {created_app_name} from ~/Applications")
                 print("   • Add to Dock for quick access")
             else:
-                print(f"   • Drag {created_app_name} to Applications folder")
+                print(
+                    f"   • Launcher is in this project folder (or run regenerateLauncher "
+                    f"with -o). Drag {created_app_name} to ~/Applications or /Applications if you like"
+                )
                 print("   • Launch it anytime for Signal Desktop")
         else:
             print("   • Use Signal Desktop normally")
@@ -647,6 +707,210 @@ class SignalCLIInterface:
         print("   • Set a Signal username so you don't have to give out this phone number: https://support.signal.org/hc/en-us/articles/6712070553754-Phone-Number-Privacy-and-Usernames")
         print("   • Optionally disable 'discover by phone number' for even more privacy")
         print("   • Set a Signal PIN so no one else can register with this number")
+        
+        print()
+        self._offer_install_receive_job(config.phone_number)
+    
+    def _offer_install_receive_job(self, phone_number: str):
+        """
+        Offer to install a launchd job that runs `signal-cli receive` on a schedule.
+        """
+        if needs_receive_job_repair(phone_number):
+            print(
+                "⚠️  LaunchAgent plist exists but the receive script is missing "
+                f"under ~/Library/Application Support/signal-voip-registration-helper/\n"
+                "   Re-run install to recreate it (safe):"
+            )
+            try:
+                fix = input(
+                    "? Repair now (recreate script and reload job)? (Y/n) › "
+                ).strip().lower()
+                if fix in ("n", "no"):
+                    print(
+                        f"   Run later: python3 signal_voip_helper.py installReceiveJob {phone_number}"
+                    )
+                    return
+                ok, msg = install_receive_job(phone_number)
+                if ok:
+                    print("✅ Repaired: script recreated and job reloaded.")
+                    print(f"   {msg}")
+                else:
+                    print(f"⚠️  {msg}")
+                return
+            except KeyboardInterrupt:
+                print()
+                return
+
+        if is_receive_job_installed(phone_number):
+            print(
+                "ℹ️  A daily background job is already installed for this number "
+                "(signal-cli receive). To remove it later, run:\n"
+                f"   python3 signal_voip_helper.py uninstallReceiveJob {phone_number}"
+            )
+            return
+        try:
+            choice = input(
+                "? Install a daily background job to fetch messages with signal-cli "
+                "(recommended — keeps encryption/session healthy)? (Y/n) › "
+            ).strip().lower()
+            if choice in ("n", "no"):
+                print(
+                    "   You can install it later with:\n"
+                    f"   python3 signal_voip_helper.py installReceiveJob {phone_number}"
+                )
+                return
+            ok, msg = install_receive_job(phone_number)
+            if ok:
+                print("✅ Background job installed.")
+                print(f"   LaunchAgent: {msg}")
+                print(
+                    "   It runs at login and about twice per day while you are logged in "
+                    "(see README). Logs: ~/Library/Logs/signal-voip-registration-helper/"
+                )
+            else:
+                print(f"⚠️  Could not install the scheduled job:\n{msg}")
+        except KeyboardInterrupt:
+            print()
+            print(
+                f"   Skipped. Install later: python3 signal_voip_helper.py installReceiveJob {phone_number}"
+            )
+    
+    def run_regenerate_launcher(
+        self,
+        phone: Optional[str] = None,
+        app_name: Optional[str] = None,
+        icon_id: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        copy_to_user_applications: bool = False,
+    ):
+        """
+        Rebuild the Signal Desktop .app launcher from an existing Signal-Profile-* folder.
+        With no phone: lists profiles under Application Support to pick interactively.
+        """
+        interactive = not phone
+        if not APP_BUILDER_AVAILABLE:
+            print("❌ Launcher builder not available (create_signal_launcher).")
+            sys.exit(1)
+
+        builder = SignalAppBuilder()
+        if not builder.check_signal_installed():
+            sys.exit(1)
+
+        profiles = discover_signal_profile_dirs()
+        if not profiles:
+            print("❌ No Signal Desktop profile folders were found.")
+            print()
+            print("Looked under:")
+            print("  ~/Library/Application Support/Signal-Profile-<digits>")
+            print()
+            print(
+                "You need a profile here first. Register with the wizard or CLI "
+                "(register / addDevice), or use Signal Desktop with this helper’s "
+                "profile path once."
+            )
+            sys.exit(1)
+
+        resolved_phone: str
+        if not phone:
+            print(self.ui.section_header("Regenerate launcher", "🔧"))
+            print("Existing Signal Desktop profiles (pick one):")
+            print()
+            for i, p in enumerate(profiles, 1):
+                try:
+                    ph = profile_dir_to_phone_number(p)
+                except ValueError:
+                    continue
+                print(f"  {i:2}. {p.name}  →  {ph}")
+            print()
+            raw = input(f"? Enter 1–{len(profiles)} › ").strip()
+            try:
+                idx = int(raw) - 1
+                if idx < 0 or idx >= len(profiles):
+                    raise ValueError
+            except ValueError:
+                print("❌ Invalid choice.")
+                sys.exit(1)
+            chosen = profiles[idx]
+            resolved_phone = profile_dir_to_phone_number(chosen)
+        else:
+            if not phone.startswith("+"):
+                print("❌ Phone number must start with + (e.g. +15551234567)")
+                sys.exit(1)
+            expected = profile_path_for_phone(phone)
+            if not expected.is_dir():
+                print(f"❌ No profile folder for that number:")
+                print(f"   {expected}")
+                print()
+                print(
+                    "Register with the normal wizard or CLI first so this folder exists, "
+                    "or run regenerateLauncher with no phone number to pick from "
+                    "discovered profiles."
+                )
+                sys.exit(1)
+            resolved_phone = phone
+
+        if icon_id is None:
+            if interactive:
+                print()
+                print("Launcher icon:")
+                for i, (slug, label) in enumerate(LAUNCHER_ICON_CHOICES, 1):
+                    print(format_launcher_icon_menu_line(i, slug, label))
+                n = len(LAUNCHER_ICON_CHOICES)
+                ip = input(f"? Choose icon 1–{n} [1] › ").strip()
+                if not ip:
+                    icon_id = default_launcher_icon_id()
+                else:
+                    try:
+                        ii = int(ip) - 1
+                        icon_id = (
+                            LAUNCHER_ICON_CHOICES[ii][0]
+                            if 0 <= ii < n
+                            else default_launcher_icon_id()
+                        )
+                    except ValueError:
+                        icon_id = default_launcher_icon_id()
+            else:
+                icon_id = default_launcher_icon_id()
+
+        if app_name is None and interactive:
+            print()
+            digits = "".join(c for c in resolved_phone if c.isdigit())
+            an = input(
+                self.ui.input_prompt(
+                    "App name suffix (empty = use digits only)",
+                    f"Example: work → Signal-work.app (default: Signal-{digits}.app)",
+                )
+            ).strip()
+            app_name = an if an else None
+
+        app_path_str = builder.create_app_bundle(
+            resolved_phone,
+            output_dir=output_dir,
+            app_name=app_name,
+            icon_id=icon_id,
+        )
+        bundle_name = Path(app_path_str).name
+        print()
+        print(f"✅ Built launcher: {app_path_str}")
+        print(
+            "   (By default this is the project folder, or the directory you set with -o.)"
+        )
+
+        do_copy = copy_to_user_applications
+        if not do_copy and interactive:
+            cp = input(
+                "? Copy this app to ~/Applications (easy to find in Finder)? (y/N) › "
+            ).strip().lower()
+            do_copy = cp in ("y", "yes")
+
+        if do_copy:
+            ok, msg = copy_signal_app_bundle_to_user_applications(
+                app_path_str, bundle_name
+            )
+            if ok:
+                print(f"✅ Copied to: {msg}")
+            else:
+                print(f"⚠️  Could not copy to ~/Applications: {msg}")
     
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""
@@ -730,20 +994,64 @@ Examples:
   # Automatically reads QR code from screenshot, or manual URI input
   python3 signal_voip_helper.py addDevice +15551112222
 
+  # Install / remove macOS daily signal-cli receive job (after registration)
+  python3 signal_voip_helper.py installReceiveJob +15551112222
+  python3 signal_voip_helper.py uninstallReceiveJob +15551112222
+
+  # Regenerate .app launcher from an existing Signal-Profile-* folder
+  python3 signal_voip_helper.py regenerateLauncher
+  python3 signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -o ~/Desktop
+  python3 signal_voip_helper.py regenerateLauncher +15551112222 --copy-to-user-applications
+
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
 2. Paste just the token part
         """
     )
     
-    parser.add_argument('mode', nargs='?', choices=['register', 'addDevice'],
-                       help='Operation mode (register or addDevice)')
+    parser.add_argument(
+        'mode',
+        nargs='?',
+        choices=[
+            'register',
+            'addDevice',
+            'installReceiveJob',
+            'uninstallReceiveJob',
+            'regenerateLauncher',
+        ],
+        help='Operation mode (see epilog)',
+    )
     parser.add_argument('phone_number', nargs='?', 
                        help='Phone number in international format (e.g., +15551112222)')
     parser.add_argument('--captcha', help='Captcha token for registration')
     parser.add_argument('--pin', help='Registration PIN (deprecated - will be prompted interactively)')
     parser.add_argument('--device-name', default='signal-cli-desktop',
                        help='Device name for linking (default: signal-cli-desktop)')
+    parser.add_argument(
+        '--app-name',
+        '-n',
+        default=None,
+        metavar='NAME',
+        help='Regenerate launcher: custom app name suffix (e.g. work → Signal-work.app)',
+    )
+    parser.add_argument(
+        '--launcher-output',
+        '-o',
+        default=None,
+        metavar='DIR',
+        help='Regenerate launcher: output directory for the .app (default: current directory)',
+    )
+    parser.add_argument(
+        '--launcher-icon',
+        choices=[s for s, _ in LAUNCHER_ICON_CHOICES],
+        default=None,
+        help='Regenerate launcher: icon from launcher_icons/ (interactive mode: optional)',
+    )
+    parser.add_argument(
+        '--copy-to-user-applications',
+        action='store_true',
+        help='Regenerate launcher: copy the built .app to ~/Applications',
+    )
     
     args = parser.parse_args()
     
@@ -753,18 +1061,52 @@ Note: For captcha tokens, you can:
     if not args.mode:
         interface.run_modern_wizard()
         return
+
+    if args.mode == "regenerateLauncher":
+        interface.run_regenerate_launcher(
+            phone=args.phone_number,
+            app_name=args.app_name,
+            icon_id=args.launcher_icon,
+            output_dir=args.launcher_output,
+            copy_to_user_applications=args.copy_to_user_applications,
+        )
+        return
     
     # Parameter mode
     if not args.phone_number:
         print("❌ Error: Phone number is required for parameter mode")
         parser.print_help()
         sys.exit(1)
+
+    if args.mode == "installReceiveJob":
+        if needs_receive_job_repair(args.phone_number):
+            print(
+                "Repairing: LaunchAgent plist exists but receive script was missing; "
+                "recreating script…",
+                file=sys.stderr,
+            )
+        ok, msg = install_receive_job(args.phone_number)
+        if ok:
+            print("✅ Daily receive job installed.")
+            print(f"   {msg}")
+            print(
+                "   Script: ~/Library/Application Support/signal-voip-registration-helper/"
+            )
+            print("   Logs: ~/Library/Logs/signal-voip-registration-helper/")
+        else:
+            print(f"❌ {msg}")
+        sys.exit(0 if ok else 1)
+
+    if args.mode == "uninstallReceiveJob":
+        ok, msg = uninstall_receive_job(args.phone_number)
+        print(msg if ok else f"❌ {msg}")
+        sys.exit(0 if ok else 1)
     
     interface.run_with_params(
-        args.mode, 
-        args.phone_number, 
+        args.mode,
+        args.phone_number,
         args.captcha,
-        args.device_name
+        args.device_name,
     )
 
 
