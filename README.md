@@ -99,7 +99,10 @@ If you already have a Signal profile folder but want a new shortcut (new icon, w
 # Non-interactive: must match an existing profile folder
 ./signal_voip_helper.py regenerateLauncher +15551112222
 ./signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -n work -o ~/Desktop
+./signal_voip_helper.py regenerateLauncher +15551112222 --copy-to-user-applications
 ```
+
+The built `.app` lands in the project directory unless you pass `-o`. Use `--copy-to-user-applications` (or answer **y** when prompted in interactive mode) to copy it to **`~/Applications`**.
 
 If there is no `~/Library/Application Support/Signal-Profile-<digits>/` for that number, register or link Desktop with this helper first.
 
