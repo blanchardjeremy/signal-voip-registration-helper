@@ -8,6 +8,8 @@ This script was designed to help with the workflow of registering Google Voice o
 
 Don't use this to spam people.
 
+![Signal Desktop launcher icon color options](docs/images/icons.png)
+
 ## Who is this for?
 
 **This is for you if:**
