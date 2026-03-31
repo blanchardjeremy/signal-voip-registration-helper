@@ -27,6 +27,7 @@ Don't use this to spam people.
 * **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
 * **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
 * **Application launcher**: Create a launcher that opens a unique instance of Signal Desktop for each account you register
+* **Daily message fetch (macOS)**: Optional background job so `signal-cli receive` runs on a schedule while you are logged in — helps keep the account and encryption material healthy without you thinking about it
 
 ## Installation
 
@@ -85,6 +86,35 @@ This will guide you through the setup process step by step.
 ```bash
 ./signal_voip_helper.py addDevice +15551112222
 ```
+
+### Daily background fetch (recommended on macOS)
+
+Signal expects clients to **receive messages regularly**. If you only use Signal Desktop and rarely touch `signal-cli`, scheduling an automatic fetch avoids stale sessions and related issues.
+
+This repo can install a **per-user LaunchAgent** (not cron) that:
+
+- Runs **`signal-cli -a YOUR_NUMBER receive`** at **login** and about **twice per day** (9:00 and 21:00 local time) while your Mac is on and you are logged in
+- Writes logs under **`~/Library/Logs/signal-voip-registration-helper/`**
+- Stores its helper script under **`~/Library/Application Support/signal-voip-registration-helper/`** and the plist under **`~/Library/LaunchAgents/`**
+
+**Interactive wizard:** after registration (or after linking Desktop), answer **Y** when asked to install the daily background job.
+
+**Command line:**
+
+```bash
+./signal_voip_helper.py installReceiveJob +15551234567
+./signal_voip_helper.py uninstallReceiveJob +15551234567
+```
+
+**If the Mac was asleep** at a scheduled time, launchd runs the job at the next interval or the next login (`RunAtLoad`). This is meant to be “good enough” for a desktop that is used regularly; it is not a 24/7 server guarantee.
+
+**Where to find the files:** In Finder, **Go → Go to Folder…** (`⇧⌘G`) and paste:
+`~/Library/Application Support/signal-voip-registration-helper/`
+(the `Library` folder is hidden by default in your home directory.)
+
+If the plist exists but **`receive-….sh` is missing**, run `installReceiveJob` again — it recreates the script without duplicating the job.
+
+**Uninstall:** use `uninstallReceiveJob` above, or delete the matching `org.signal.voip-helper.receive.*.plist` in `~/Library/LaunchAgents/` and remove the `receive-*.sh` script from Application Support, then run `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.signal.voip-helper.receive.<digits>.plist` if the agent was loaded.
 
 ### Getting Captcha Tokens
 

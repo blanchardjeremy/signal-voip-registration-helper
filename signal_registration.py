@@ -584,14 +584,16 @@ def get_daemon_setup_info(phone_number: str, is_primary: bool = True) -> str:
     if is_primary:
         return f"""=== Important: Regular Message Receiving ===
 Signal protocol requires regular message receiving for proper encryption.
-You should regularly run:
+
+On macOS with this helper, the easiest option is the built-in daily job:
+  python3 signal_voip_helper.py installReceiveJob {phone_number}
+(Or say yes when the wizard offers it after registration.)
+
+You can also run manually:
   signal-cli -a {phone_number} receive
 
-For continuous operation, you can run the daemon:
-  signal-cli -a {phone_number} daemon
-
-Or set up a simple cron job (every 5 minutes):
-*/5 * * * * signal-cli -a {phone_number} receive"""
+For continuous operation:
+  signal-cli -a {phone_number} daemon"""
     else:
         return """=== Linked Device Setup Complete ===
 Your device is now linked! For ongoing use, you can:

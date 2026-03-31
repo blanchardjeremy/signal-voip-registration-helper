@@ -29,6 +29,12 @@ from launcher_icon_catalog import (
     default_launcher_icon_id,
     launcher_icon_label,
 )
+from signal_receive_job import (
+    install_receive_job,
+    is_receive_job_installed,
+    needs_receive_job_repair,
+    uninstall_receive_job,
+)
 
 try:
     import qr_utils
@@ -625,6 +631,9 @@ class SignalCLIInterface:
         print("💾 Account data stored in: ~/.local/share/signal-cli/data/")
         print()
         
+        self._offer_install_receive_job(config.phone_number)
+        print()
+        
         # Ask if they want to set up Signal Desktop
         try:
             setup_desktop = input("? Would you like to set up Signal Desktop now? (Y/n) › ").strip().lower()
@@ -682,6 +691,73 @@ class SignalCLIInterface:
         print("   • Set a Signal username so you don't have to give out this phone number: https://support.signal.org/hc/en-us/articles/6712070553754-Phone-Number-Privacy-and-Usernames")
         print("   • Optionally disable 'discover by phone number' for even more privacy")
         print("   • Set a Signal PIN so no one else can register with this number")
+        
+        print()
+        self._offer_install_receive_job(config.phone_number)
+    
+    def _offer_install_receive_job(self, phone_number: str):
+        """
+        Offer to install a launchd job that runs `signal-cli receive` on a schedule.
+        """
+        if needs_receive_job_repair(phone_number):
+            print(
+                "⚠️  LaunchAgent plist exists but the receive script is missing "
+                f"under ~/Library/Application Support/signal-voip-registration-helper/\n"
+                "   Re-run install to recreate it (safe):"
+            )
+            try:
+                fix = input(
+                    "? Repair now (recreate script and reload job)? (Y/n) › "
+                ).strip().lower()
+                if fix in ("n", "no"):
+                    print(
+                        f"   Run later: python3 signal_voip_helper.py installReceiveJob {phone_number}"
+                    )
+                    return
+                ok, msg = install_receive_job(phone_number)
+                if ok:
+                    print("✅ Repaired: script recreated and job reloaded.")
+                    print(f"   {msg}")
+                else:
+                    print(f"⚠️  {msg}")
+                return
+            except KeyboardInterrupt:
+                print()
+                return
+
+        if is_receive_job_installed(phone_number):
+            print(
+                "ℹ️  A daily background job is already installed for this number "
+                "(signal-cli receive). To remove it later, run:\n"
+                f"   python3 signal_voip_helper.py uninstallReceiveJob {phone_number}"
+            )
+            return
+        try:
+            choice = input(
+                "? Install a daily background job to fetch messages with signal-cli "
+                "(recommended — keeps encryption/session healthy)? (Y/n) › "
+            ).strip().lower()
+            if choice in ("n", "no"):
+                print(
+                    "   You can install it later with:\n"
+                    f"   python3 signal_voip_helper.py installReceiveJob {phone_number}"
+                )
+                return
+            ok, msg = install_receive_job(phone_number)
+            if ok:
+                print("✅ Background job installed.")
+                print(f"   LaunchAgent: {msg}")
+                print(
+                    "   It runs at login and about twice per day while you are logged in "
+                    "(see README). Logs: ~/Library/Logs/signal-voip-registration-helper/"
+                )
+            else:
+                print(f"⚠️  Could not install the scheduled job:\n{msg}")
+        except KeyboardInterrupt:
+            print()
+            print(
+                f"   Skipped. Install later: python3 signal_voip_helper.py installReceiveJob {phone_number}"
+            )
     
     def run_modern_wizard(self):
         """Run the modern wizard with upfront configuration collection"""
@@ -765,14 +841,27 @@ Examples:
   # Automatically reads QR code from screenshot, or manual URI input
   python3 signal_voip_helper.py addDevice +15551112222
 
+  # Install / remove macOS daily signal-cli receive job (after registration)
+  python3 signal_voip_helper.py installReceiveJob +15551112222
+  python3 signal_voip_helper.py uninstallReceiveJob +15551112222
+
 Note: For captcha tokens, you can:
 1. Paste the full line from the browser console
 2. Paste just the token part
         """
     )
     
-    parser.add_argument('mode', nargs='?', choices=['register', 'addDevice'],
-                       help='Operation mode (register or addDevice)')
+    parser.add_argument(
+        'mode',
+        nargs='?',
+        choices=[
+            'register',
+            'addDevice',
+            'installReceiveJob',
+            'uninstallReceiveJob',
+        ],
+        help='Operation mode (register, addDevice, or install/uninstall daily receive job)',
+    )
     parser.add_argument('phone_number', nargs='?', 
                        help='Phone number in international format (e.g., +15551112222)')
     parser.add_argument('--captcha', help='Captcha token for registration')
@@ -794,12 +883,36 @@ Note: For captcha tokens, you can:
         print("❌ Error: Phone number is required for parameter mode")
         parser.print_help()
         sys.exit(1)
+
+    if args.mode == "installReceiveJob":
+        if needs_receive_job_repair(args.phone_number):
+            print(
+                "Repairing: LaunchAgent plist exists but receive script was missing; "
+                "recreating script…",
+                file=sys.stderr,
+            )
+        ok, msg = install_receive_job(args.phone_number)
+        if ok:
+            print("✅ Daily receive job installed.")
+            print(f"   {msg}")
+            print(
+                "   Script: ~/Library/Application Support/signal-voip-registration-helper/"
+            )
+            print("   Logs: ~/Library/Logs/signal-voip-registration-helper/")
+        else:
+            print(f"❌ {msg}")
+        sys.exit(0 if ok else 1)
+
+    if args.mode == "uninstallReceiveJob":
+        ok, msg = uninstall_receive_job(args.phone_number)
+        print(msg if ok else f"❌ {msg}")
+        sys.exit(0 if ok else 1)
     
     interface.run_with_params(
-        args.mode, 
-        args.phone_number, 
+        args.mode,
+        args.phone_number,
         args.captcha,
-        args.device_name
+        args.device_name,
     )
 
 
