@@ -1,175 +1,82 @@
-# Signal VOIP Registration Script
+# Signal VOIP Registration Helper
 
-A helper script for registering new Signal accounts **without a phone** and linking to Signal Desktop. Only works for macOS.
+**macOS only.** Register a new Signal account using [`signal-cli`](https://github.com/AsamK/signal-cli) (no physical phone), then link **Signal Desktop** as a second device. Good for Google Voice / VOIP numbers and running **multiple Signal numbers** from one Mac.
 
-This script was designed to help with the workflow of registering Google Voice or other VOIP numbers that are not working on a physical phone and attaching them to unique Signal Desktop instances, so you can run multiple Signal numbers from one profile.
+**Not** for “I already use Signal on my phone and only want another Desktop” — see [this wiki guide](https://github.com/blanchardjeremy/signal-voip-registration-helper/wiki/How-to-run-multiple-Signal-Desktop-instances-on-macOS) instead.
 
-**Warning:** This tool is new and hasn't been tested for long-term use. Please report bugs you encounter.
-
-Don't use this to spam people.
+Early-stage tool. Don’t use it to spam.
 
 ![Signal Desktop launcher icon color options](docs/images/icons.png)
 
-## Who is this for?
+## Quick start
 
-**This is for you if:**
+1. **Get a number** you can receive SMS on (see [Phone numbers](#phone-numbers) below).
 
-* You want to run multiple Signal accounts from your computer
-* You don't want to have to buy another phone just to run another Signal account
-* You don't need this Signal account to also be attached to a physical phone
-* You want a free/cheap Signal account
-
-**This tool is not for you if:**
-
-* You already have your Signal account registered to a physical phone. (I made a guide for just [creating a second Signal Desktop instance when you already have a phone as your primary device](https://github.com/blanchardjeremy/signal-voip-registration-helper/wiki/How-to-run-multiple-Signal-Desktop-instances-on-macOS)).
-
-## Features
-
-* **New Account Registration**: Register a new Signal account (without needing a physical phone). The primary "device" is actually just the [`signal-cli`](https://github.com/AsamK/signal-cli) library on your computer. However, after you link it to a Signal Desktop instance, you won't need to use `signal-cli` again.
-* **Link Signal Desktop**: Link Signal Desktop as a [secondary device](https://support.signal.org/hc/en-us/articles/360007320551-Linked-Devices)
-* **QR Code support**: Helps you scan the QR code during the Signal Desktop linking process. This is useful because that process is built for linking a phone where you can scan the code with your phone camera. In this case, our computer is the primary device, so it's a little cumbersome to get the data within the QR code.
-* **Application launcher**: Create a `Signal-….app` that opens a unique Signal Desktop profile. The `.app` is written **next to this repo** by default (or use `-o`). When you link Desktop, you can choose to **copy it to `~/Applications`** (your user Applications folder — no admin). System `/Applications` is optional; drag there in Finder if you want it for all users.
-* **Daily message fetch (macOS)**: Optional background job so `signal-cli receive` runs on a schedule while you are logged in — helps keep the account and encryption material healthy without you thinking about it
-* **Regenerate launcher**: Rebuild the Signal Desktop `.app` shortcut for an existing profile under `~/Library/Application Support/Signal-Profile-<digits>/` (pick from a list or pass the phone number)
-
-## Installation
-
-1. Clone or download this repository
+2. **Install, clone, and run the wizard** ([Homebrew](https://brew.sh/) required for `brew`):
 
    ```bash
+   # Install dependences (zbar is for QR scanning)
+   brew install signal-cli zbar
+
+   # This repository
    git clone https://github.com/blanchardjeremy/signal-voip-registration-helper
    cd signal-voip-registration-helper
+
+   # Interactive setup (captcha, SMS, Desktop link, …)
+   ./signal_voip_helper.py
    ```
 
-2. Install dependencies via Homebrew: (Make sure to [install Homebrew](https://brew.sh/) first)
+The wizard walks you through captcha, SMS verification, optional launcher icon, copying the app to `~/Applications`, daily `signal-cli receive`, and linking Desktop (QR code).
 
-   ```bash
-   brew install signal-cli zbar
-   ```
+**Captcha (registration):** open [signalcaptchas.org/registration/generate.html](https://signalcaptchas.org/registration/generate.html), solve it, right‑click **Open Signal** → **Copy link address**, paste when asked.
 
-## Prerequsite: Get a VOIP number
+## Phone numbers
 
-To make a Signal account, you do need a phone number, but you _do not_ need to purchase a phone or pay for a standard cell phone plan in order to get that phone number. You can use a [VOIP](https://en.wikipedia.org/wiki/Voice_over_IP) number through a service like Google Voice or rent a phone number for a few minutes just to register the account. It is helpful to get a number you control long-term so that you don't lose access to the Signal account in case you ever need to re-verify it, but we provide less-reliable methods below as well.
+You need **some** number for Signal; it doesn’t have to be a cell plan. [VOIP](https://en.wikipedia.org/wiki/Voice_over_IP) is fine.
 
-**Where you can get a VOIP number:**
+| Option | Notes |
+|--------|--------|
+| [Google Voice](https://workspace.google.com/products/voice/) | Free. The number can lapse if unused (Google Voice’s rules, not Signal’s). |
+| [MySudo](https://anonyome.com/individuals/mysudo/) | Paid tiers. |
 
-_Note:_ These won't be anonymous numbers since your identity is required to set up each account.
+**Riskier (temporary numbers):** [SMSPool](https://smspool.net/) and similar — cheap, but you may not keep the number. If you use them, set a [Signal PIN + registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and check the number regularly, or someone else could register it later.
 
-* [Google Voice](https://workspace.google.com/products/voice/) - free - Your number will expire if you don't send a text or make a call once every 3 months. (From Google Voice, not from Signal.)
-* [MySudo](https://anonyome.com/individuals/mysudo/) - $2/mo for 1 number, $15/mo for 9 numbers
-
-**Alternate: Less-reliable options for getting a VOIP number:**
-
-> [!WARNING]
-> Use the options below with caution because you only control this number temporarily and there is a chance it can be registered by someone else in the future. The way to ensure you maintain control is to A) set a [Signal PIN](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN) and enable Signal's [registration lock](https://support.signal.org/hc/en-us/articles/360007059792-Signal-PIN#manage_registration_lock) feature and B) check the messages on this number at least once every 7 days. If you do both of those things, you should maintain control.
-
-* [SMSPool](https://smspool.net/) - $0.20 per registration - Much cheaper to use if you need to register many accounts. For increased anonymity, you can purchase using Monero and access the site through Tor.
-
-## Usage
-
-### Interactive Wizard Mode (Recommended)
+## Command-line (skip the wizard)
 
 ```bash
-./signal_voip_helper.py
-```
-
-This will guide you through the setup process step by step.
-
-### Command Line Mode
-
-#### Register New Account
-
-```bash
-# With captcha token
-./signal_voip_helper.py register +15551112222 --captcha <token>
-```
-
-#### Link Signal Desktop as Secondary Device
-
-```bash
+./signal_voip_helper.py register +15551112222 --captcha '<token>'
 ./signal_voip_helper.py addDevice +15551112222
 ```
 
-#### Regenerate the Desktop launcher (.app)
+| Command | Purpose |
+|---------|---------|
+| `regenerateLauncher` | Rebuild the `Signal-….app` for an existing profile. Run with no args to pick a profile, or pass `+number`. Use `--copy-to-user-applications` or `-o` if you want it in `~/Applications` or another folder. |
+| `installReceiveJob` / `uninstallReceiveJob` | Install or remove a macOS LaunchAgent that runs `signal-cli receive` on a schedule (about twice a day and at login). Logs live under `~/Library/Logs/signal-voip-registration-helper/`. |
 
-If you already have a Signal profile folder but want a new shortcut (new icon, wrong name, deleted `.app`):
-
-```bash
-# Interactive: list Signal-Profile-* folders and pick one
-./signal_voip_helper.py regenerateLauncher
-
-# Non-interactive: must match an existing profile folder
-./signal_voip_helper.py regenerateLauncher +15551112222
-./signal_voip_helper.py regenerateLauncher +15551112222 --launcher-icon rose -n work -o ~/Desktop
-./signal_voip_helper.py regenerateLauncher +15551112222 --copy-to-user-applications
-```
-
-The built `.app` lands in the project directory unless you pass `-o`. Use `--copy-to-user-applications` (or answer **y** when prompted in interactive mode) to copy it to **`~/Applications`**.
-
-If there is no `~/Library/Application Support/Signal-Profile-<digits>/` for that number, register or link Desktop with this helper first.
-
-### Daily background fetch (recommended on macOS)
-
-Signal expects clients to **receive messages regularly**. If you only use Signal Desktop and rarely touch `signal-cli`, scheduling an automatic fetch avoids stale sessions and related issues.
-
-This repo can install a **per-user LaunchAgent** (not cron) that:
-
-* Runs **`signal-cli -a YOUR_NUMBER receive`** at **login** and about **twice per day** (9:00 and 21:00 local time) while your Mac is on and you are logged in
-* Writes logs under **`~/Library/Logs/signal-voip-registration-helper/`**
-* Stores its helper script under **`~/Library/Application Support/signal-voip-registration-helper/`** and the plist under **`~/Library/LaunchAgents/`**
-
-**Interactive wizard:** after registration (or after linking Desktop), answer **Y** when asked to install the daily background job.
-
-**Command line:**
-
-```bash
-./signal_voip_helper.py installReceiveJob +15551234567
-./signal_voip_helper.py uninstallReceiveJob +15551234567
-```
-
-**If the Mac was asleep** at a scheduled time, launchd runs the job at the next interval or the next login (`RunAtLoad`). This is meant to be “good enough” for a desktop that is used regularly; it is not a 24/7 server guarantee.
-
-**Where to find the files:** In Finder, **Go → Go to Folder…** (`⇧⌘G`) and paste:
-`~/Library/Application Support/signal-voip-registration-helper/`
-(the `Library` folder is hidden by default in your home directory.)
-
-If the plist exists but **`receive-….sh` is missing**, run `installReceiveJob` again — it recreates the script without duplicating the job.
-
-**Uninstall:** use `uninstallReceiveJob` above, or delete the matching `org.signal.voip-helper.receive.*.plist` in `~/Library/LaunchAgents/` and remove the `receive-*.sh` script from Application Support, then run `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.signal.voip-helper.receive.<digits>.plist` if the agent was loaded.
-
-### Getting Captcha Tokens
-
-1. Open <https://signalcaptchas.org/registration/generate.html> in your browser
-2. Solve the captcha
-3. Right click on the "Open Signal" link and click "Copy link address"
-4. Paste the link address into the prompt
+Run `./signal_voip_helper.py --help` for flags (`--launcher-icon`, `-o`, etc.).
 
 ## Troubleshooting
 
-1. **"signal-cli is not installed or not in PATH"**
-   * Install `signal-cli` following the instructions above
-   * Ensure it's in your system PATH
+* **`signal-cli` not found** — Run `brew install signal-cli` and make sure Homebrew’s bin directory is on your `PATH`.
+* **No SMS code** — Use international format (`+` and country code). For Google Voice, check spam and filters.
+* **Linking fails** — Generate a new QR in Signal Desktop if it may have expired. The pasted link must start with `sgnl://linkdevice?`. Quit Signal Desktop first when the wizard asks (linking won’t work if it is already running).
 
-2. **Verification code not received**
-   * Check your phone for SMS
-   * Ensure your phone number is correct
+## Security
 
-3. **Device linking fails**
-   * Make sure the QR code hasn't expired
-   * Verify the linking URI starts with `sgnl://linkdevice?`
-   * Ensure you're running from the correct signal-cli account
+Treat phone numbers and codes like secrets. This project doesn’t phone home; Signal traffic is between your machine and Signal’s servers. Data lives under `~/.local/share/signal-cli/data/` and your Desktop profile dirs.
 
-## Security Notes
+## Features (what’s included)
 
-* Phone numbers and verification codes should be kept private
-* The script stores no sensitive data locally
-* No data is sent off your machine (except to interact directly with Signal's servers, of course)
-* All Signal data is stored in `~/.local/share/signal-cli/data/`
+* Register with **signal-cli**, captcha, and SMS verification. The wizard can turn on **registration lock** with `setPin`.
+* **Link Signal Desktop** as a second device (signal-cli stays primary). Helpers for scanning or pasting the link QR.
+* **Colored launcher apps** (`Signal-….app`) and optional copy into **`~/Applications`**.
+* **Regenerate launcher** if you removed the app or want a different icon or name.
+* **Optional daily `receive` job** on macOS (LaunchAgent) so messages are fetched without running `signal-cli` by hand.
 
 ## License
 
-See [LICENSE.txt](./LICENSE.txt) for license details.
+[LICENSE.txt](./LICENSE.txt)
 
 ## Contributing
 
-Feel free to submit issues, feature requests, or pull requests to improve this script.
+Issues and PRs welcome.
